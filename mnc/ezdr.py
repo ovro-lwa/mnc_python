@@ -1,7 +1,7 @@
 import time
 import json
 
-from mcs import Client
+from mnc.mcs import Client
 
 
 __all__ = ['discover_recorders', 'Lwa352RecorderControl']
