@@ -1,43 +1,93 @@
 import numpy as np
-from lwautils import lwa_arx 
-from lwa_f import snap2_fengine
-from lwa352_pipeline_control import Lwa352CorrelatorControl
-from mnc import ezdr
+import yaml
+from lwautils import lwa_arx   # arx
+from lwa_f import snap2_fengine, helpers  # fengine
+from lwa352_pipeline_control import Lwa352CorrelatorControl  # xengine
+from mnc import ezdr  # dr
 
-# config
-configfile = 'lwa_config.yaml'
-# or
-arxadrs = list(range(35, 46))  # currently installed
-arx_config = 1 # 0, 1, 2 save preset config
-snap2names = ['snap09', 'snap10', 'snap11']
-xhosts = [f'lxdlwagpu{i:02}' for i in range(1, 9)] # 4.3 MHz subband per pipeline pair
-xnpipeline = 4  # x-eng
-x_dest_corr_ip = ['10.41.0.25', '10.41.0.25', '10.41.0.41', '10.41.0.41']
-x_dest_corr_port = [10001+i//4 for i in range(32)]
-x_dest_beam_ip = ['10.41.0.19'] + ['0.0.0.0']*15
-x_dest_beam_port = [20001]
-recorders = ['slow'] # slow, fast, power, voltage
 
-# arx
-ma = lwa_arx.ARX() 
-for adr in arxadrs: 
-    ma.load_cfg(adr, arx_config)
+class Controller():
+    """ Parse configuration and control all subsystems in uniform manner.
+    Ideally, will also make it easy to monitor basic system status.
+    """
 
-# f-eng
-for snap2name in snap2names:
-    f = snap2_fengine.Snap2Fengine(snap2name)
-    f.fpga.print_status()  # confirm firmware name is right
-    if not f.fpga.is_programmed():
-        f.program()
-        # sleep 30?
-        f.initialize(read_only=False)
+    self.logger = logger or helpers.add_default_log_handlers(logging.getLogger(__name__ + ":%s" % (host)))
 
-    f.cold_start_from_config(configfile)
-    status = f.get_status_all() # or f.print_status_all()
+    def __init__(self, config_file='lwa_config.yaml', **kwargs):
+        with open(config_file, 'r') as fh:
+            conf = yaml.load(fh, Loader=yaml.CSafeLoader)
+        if 'fengines' not in conf:
+            self.logger.error("No 'fengines' key in output configuration!")
+            raise RuntimeError('Config file missing "fengines" key')
+        if 'xengines' not in conf:
+            self.logger.error("No 'xengines' key in output configuration!")
+            raise RuntimeError('Config file missing "xengines" key')
+        if 'arx' not in conf:
+            self.logger.error("No 'arx' key in output configuration!")
+            raise RuntimeError('Config file missing "arx" key')
+        if 'dr' not in conf:
+            self.logger.error("No 'dr' key in output configuration!")
+            raise RuntimeError('Config file missing "dr" key')
 
+        # TODO: overload with kwargs
+        for key, value in kwargs.items():
+            print(key, value)
+            
+        self.conf = conf
+
+    def set_arx(self):
+        aconf = self.conf['arx']
+
+        ma = lwa_arx.ARX() 
+        for adr in arxadrs: 
+            ma.load_cfg(adr, arx_config)
+
+            
+    def start_fengine(self, initialize=False, program=False):
+        """ 
+        """
+
+        fconf = self.conf['fengines']
+        snap2names = fconf['snap2_inuse']
+        chans_per_packet = fconf['chans_per_packet']
+
+        macs = self.conf['xengines']['arp']
+        dests = []
+        for xeng, chans in self.conf['xengines']['chans'].items():
+            dest_ip = xeng.split('-')[0]
+            dest_port = int(xeng.split('-')[1])
+            start_chan = chans[0]
+            nchan = chans[1] - start_chan
+            dests += [{'ip':dest_ip, 'port':dest_port, 'start_chan':start_chan, 'nchan':nchan}]
+
+
+        for snap2name in snap2names:
+            print(f'Starting f-engine on {snap2name}')
+            self.logger.info(f'Starting f-engine on {snap2name}')
+
+            localconf = fconf.get(self.hostname, None)
+            if localconf is None:
+                self.logger.error("No configuration for F-engine host %s" % self.hostname)
+                raise RuntimeError("No config found for F-engine host %s" % self.hostname)
+
+            first_stand_index = localconf['ants'][0]  # Should refer to first SNAP in use?
+            nstand = localconf['ants'][1] - first_stand_index
+            source_ip = localconf['gbe']
+            source_port = localconf['source_port']
+
+            self.cold_start(program = program, initialize = initialize, test_vectors = test_vectors, sync = sync,
+                            sw_sync = sw_sync, enable_eth = enable_eth, chans_per_packet = chans_per_packet,
+                            first_stand_index = first_stand_index, nstand = nstand, macs = macs, source_ip = source_ip,
+                            source_port = source_port, dests = dests)
+
+            f = snap2_fengine.Snap2Fengine(snap2name)
+            f.print_status_all()
+
+    def start_xengine(self):
+        xconf = self.conf['xengines']
 # x-eng
 p = Lwa352CorrelatorControl(xhosts, npipeline_per_host=xnpipeline)
-
+        
 # start them
 p.stop_pipelines()   # stop then start
 p.start_pipelines() 
@@ -59,7 +109,9 @@ for p in pipelines:
 
 p.stop_pipelines()
 
-# dr
+    def start_dr(self):
+        dconf = self.conf['dr']
+            
 # start ms writing
 for recorder in recorders:
     lwa_drc = ezdr.Lwa352RecorderControl(recorder)  # auto-discovery
