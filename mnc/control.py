@@ -14,6 +14,8 @@ class Controller():
     self.logger = logger or helpers.add_default_log_handlers(logging.getLogger(__name__ + ":%s" % (host)))
 
     def __init__(self, config_file='lwa_config.yaml', **kwargs):
+        self.config_file = config_file
+
         with open(config_file, 'r') as fh:
             conf = yaml.load(fh, Loader=yaml.CSafeLoader)
         if 'fengines' not in conf:
@@ -35,23 +37,31 @@ class Controller():
             
         self.conf = conf
 
-    def set_arx(self):
+    def set_arx(self, preset=None):
+        """ Set ARX to preset config.
+        Defaults to preset in configuration file.
+        """
+
         aconf = self.conf['arx']
+        if preset is None:
+            preset = aconf['preset']
 
         ma = lwa_arx.ARX() 
-        for adr in arxadrs: 
-            ma.load_cfg(adr, arx_config)
+        for adr in aconf['adrs']:
+            ma.load_cfg(adr, preset)
 
-            
-    def start_fengine(self, initialize=False, program=False):
-        """ 
+    def start_fengine(self, initialize=False, program=False, force=False):
+        """ Start the fengines on all snap2s.
+        Defaults to all listed in "snap2s_inuse" field of configuration file.
+        Optionally can initialize and program.
+        force will run cold_start method regardless of current state.
         """
 
         fconf = self.conf['fengines']
-        snap2names = fconf['snap2_inuse']
+        snap2names = fconf['snap2s_inuse']
         chans_per_packet = fconf['chans_per_packet']
-
         macs = self.conf['xengines']['arp']
+
         dests = []
         for xeng, chans in self.conf['xengines']['chans'].items():
             dest_ip = xeng.split('-')[0]
@@ -60,65 +70,95 @@ class Controller():
             nchan = chans[1] - start_chan
             dests += [{'ip':dest_ip, 'port':dest_port, 'start_chan':start_chan, 'nchan':nchan}]
 
-
         for snap2name in snap2names:
-            print(f'Starting f-engine on {snap2name}')
-            self.logger.info(f'Starting f-engine on {snap2name}')
-
-            localconf = fconf.get(self.hostname, None)
-            if localconf is None:
-                self.logger.error("No configuration for F-engine host %s" % self.hostname)
-                raise RuntimeError("No config found for F-engine host %s" % self.hostname)
-
-            first_stand_index = localconf['ants'][0]  # Should refer to first SNAP in use?
-            nstand = localconf['ants'][1] - first_stand_index
-            source_ip = localconf['gbe']
-            source_port = localconf['source_port']
-
-            self.cold_start(program = program, initialize = initialize, test_vectors = test_vectors, sync = sync,
-                            sw_sync = sw_sync, enable_eth = enable_eth, chans_per_packet = chans_per_packet,
-                            first_stand_index = first_stand_index, nstand = nstand, macs = macs, source_ip = source_ip,
-                            source_port = source_port, dests = dests)
-
             f = snap2_fengine.Snap2Fengine(snap2name)
-            f.print_status_all()
+            if program and f.fpga.is_programmed():
+                print(f'{snap2name} is already programmed.')
+            if f.is_connected() and not force:
+                print(f'{snap2name} is already connected.')
+                continue
+            else:
+                print(f'Starting f-engine on {snap2name}')
+                self.logger.info(f'Starting f-engine on {snap2name}')
+
+                localconf = fconf.get(snap2name, None)
+                if localconf is None:
+                    self.logger.error(f"No configuration for F-engine host {snap2name}")
+                    raise RuntimeError(f"No config found for F-engine host {snap2name}")
+                
+                first_stand_index = localconf['ants'][0]
+                nstand = localconf['ants'][1] - first_stand_index
+                source_ip = localconf['gbe']
+                source_port = localconf['source_port']
+
+                self.cold_start(program = program, initialize = initialize, test_vectors = test_vectors, sync = sync,
+                                sw_sync = sw_sync, enable_eth = enable_eth, chans_per_packet = chans_per_packet,
+                                first_stand_index = first_stand_index, nstand = nstand, macs = macs, source_ip = source_ip,
+                                source_port = source_port, dests = dests)
+                
+                f.print_status_all()
 
     def start_xengine(self):
+        """ Start xengines listed in configuration file.
+        """
+
         xconf = self.conf['xengines']
-# x-eng
-p = Lwa352CorrelatorControl(xhosts, npipeline_per_host=xnpipeline)
+        p = Lwa352CorrelatorControl(xconf['xhosts'], npipeline_per_host=xconf['xnpipeline'])
+        ## QUESTION: p controls all pipelines on all hosts?
         
-# start them
-p.stop_pipelines()   # stop then start
-p.start_pipelines() 
-p.pipelines_are_up()
+        p.stop_pipelines()   # stop before starting
+        p.start_pipelines() 
+        print(f'pipelines up? {p.pipelines_are_up()}')
+        self.logger.info(f'pipelines up? {p.pipelines_are_up()}')
 
-# each pipeline pair needs the same destination IP/port numbers, which should be unique from all other pairs
-p.configure_corr(dest_ip=x_dest_corr_ip, dest_port=x_dest_corr_port)
+        # QUESTION: is this standard after start_pipelines?
+        p.configure_corr(dest_ip=xconf['x_dest_corr_ip'], dest_port=xconf['x_dest_corr_port'])
 
-# beamforming data recorder
-for p in pipelines:
-    p.beamform_output.set_destination(x_dest_beam_ip, x_dest_beam_port) # 1 power beam
-    for b in range(2):  # two pols
-        for i in range(352):
-            s0 = 1 if b == 0 and i == 2 else 0
-            s1 = 1 if b == 1 and i == 2 else 0
-            p.beamform.update_calibration_gains(b, 2*i+0, s0*np.ones(96, dtype=np.complex64))
-            p.beamform.update_calibration_gains(b, 2*i+1, s1*np.ones(96, dtype=np.complex64))
-            p.beamform.update_delays(b, np.zeros(352*2)) 
+        # QUESTION: how to identify whether beamformed data is being produced?
+        for p in pipelines:   # QUESTION: how to list all pipelines?
+            p.beamform_output.set_destination(xconf['x_dest_beam_ip'], xconf['x_dest_beam_port']) # 1 power beam
+            for b in range(2):  # two pols
+                for i in range(352):
+                    s0 = 1 if b == 0 and i == 2 else 0
+                    s1 = 1 if b == 1 and i == 2 else 0
+                    p.beamform.update_calibration_gains(b, 2*i+0, s0*np.ones(96, dtype=np.complex64))
+                    p.beamform.update_calibration_gains(b, 2*i+1, s1*np.ones(96, dtype=np.complex64))
+                    p.beamform.update_delays(b, np.zeros(352*2))
 
-p.stop_pipelines()
+    def stop_xengine(self):
+        """ Stop xengines listed in configuration file.
+        """
 
-    def start_dr(self):
+        xconf = self.conf['xengines']
+        p = Lwa352CorrelatorControl(xconf['xhosts'], npipeline_per_host=xconf['xnpipeline'])
+        p.stop_pipeline()
+
+    def start_dr(self, recorders=None):
+        """ Start data recorders listed recorders.
+        Defaults to starting those listed in configuration file.
+        """
+
+        # uses ezdr auto-discovery 'slow', 'fast', 'power', 'voltage'
         dconf = self.conf['dr']
-            
-# start ms writing
-for recorder in recorders:
-    lwa_drc = ezdr.Lwa352RecorderControl(recorder)  # auto-discovery
-    lwa_drc.print_status()
-    lwa_drc.start()
+        if not recorders:
+            recorders = dconf['recorders']
 
-# stop ms writing
-for recorder in recorders:
-    lwa_drc = ezdr.Lwa352RecorderControl(recorder)  # auto-discovery 'slow', 'fast', 'power', 'voltage'
-    lwa_drc.stop()
+        # start ms writing
+        for recorder in recorders:
+            lwa_drc = ezdr.Lwa352RecorderControl(recorder)
+            lwa_drc.print_status()   # TODO: send to self.logger
+            lwa_drc.start()
+
+    def stop_dr(self, recorders=None):
+        """ Stop data recorders in list recorders.
+        Defaults to stopping those listed in configuration file.
+        """
+
+        dconf = self.conf['dr']
+        if not recorders:
+            recorders = dconf['recorders']
+
+        for recorder in recorders:
+            lwa_drc = ezdr.Lwa352RecorderControl(recorder)
+            lwa_drc.stop()
+          

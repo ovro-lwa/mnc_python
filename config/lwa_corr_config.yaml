@@ -1,3 +1,7 @@
+arx:
+    adrs: [35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45]
+    preset: 1
+
 fengines:
     snap2s_inuse: ['snap09', 'snap10', 'snap11']
     chans_per_packet: 96
@@ -47,6 +51,8 @@ fengines:
         source_port: 10000
 
 xengines:
+  xhosts: ['lxdlwagpu01', 'lxdlwagpu02', 'lxdlwagpu03', 'lxdlwagpu04', 'lxdlwagpu05', 'lxdlwagpu06', 'lxdlwagpu07', 'lxdlwagpu08']
+  nxpipeline: 4
   arp:
     # lwa-gpu01
     10.41.0.18: 0x043f72d0b10e
@@ -113,15 +119,10 @@ xengines:
     10.41.0.24-20000: [3424, 3520]
     10.41.0.40-10000: [3520, 3616]
     10.41.0.40-20000: [3616, 3712]
+  x_dest_corr_ip = ['10.41.0.25', '10.41.0.25', '10.41.0.41', '10.41.0.41']
+  x_dest_corr_port = [10001, 10001, 10001, 10001, 10002, 10002, 10002, 10002, 10003, 10003, 10003, 10003, 10004, 10004, 10004, 10004, 10005, 10005, 10005, 10005, 10006, 10006, 10006, 10006, 10007, 10007, 10007, 10007, 10008, 10008, 10008, 10008]
+  x_dest_beam_ip = ['10.41.0.19'] + ['0.0.0.0'] + ['0.0.0.0'] + ['0.0.0.0'] + ['0.0.0.0'] + ['0.0.0.0'] + ['0.0.0.0'] + ['0.0.0.0'] + ['0.0.0.0'] + ['0.0.0.0'] + ['0.0.0.0'] + ['0.0.0.0'] + ['0.0.0.0'] + ['0.0.0.0'] + ['0.0.0.0'] + ['0.0.0.0']
+  x_dest_beam_port = [20001]
 
-arx:
-    adrs: [35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45]
-    config: 1
-
-xhosts = [f'lxdlwagpu{i:02}' for i in range(1, 9)] # 4.3 MHz subband per pipeline pair
-xnpipeline = 4  # x-eng
-x_dest_corr_ip = ['10.41.0.25', '10.41.0.25', '10.41.0.41', '10.41.0.41']
-x_dest_corr_port = [10001+i//4 for i in range(32)]
-x_dest_beam_ip = ['10.41.0.19'] + ['0.0.0.0']*15
-x_dest_beam_port = [20001]
-recorders = ['slow'] # slow, fast, power, voltage
+dr:
+    recorders = ['slow'] # slow, fast, power, voltage
