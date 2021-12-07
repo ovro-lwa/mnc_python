@@ -91,10 +91,10 @@ class Controller():
                 source_ip = localconf['gbe']
                 source_port = localconf['source_port']
 
-                self.cold_start(program = program, initialize = initialize, test_vectors = test_vectors, sync = sync,
-                                sw_sync = sw_sync, enable_eth = enable_eth, chans_per_packet = chans_per_packet,
-                                first_stand_index = first_stand_index, nstand = nstand, macs = macs, source_ip = source_ip,
-                                source_port = source_port, dests = dests)
+                f.cold_start(program = program, initialize = initialize, test_vectors = test_vectors, sync = sync,
+                             sw_sync = sw_sync, enable_eth = enable_eth, chans_per_packet = chans_per_packet,
+                             first_stand_index = first_stand_index, nstand = nstand, macs = macs, source_ip = source_ip,
+                             source_port = source_port, dests = dests)
                 
                 f.print_status_all()
 
@@ -103,27 +103,27 @@ class Controller():
         """
 
         xconf = self.conf['xengines']
+
+        # one p object controls all products on given subband
         p = Lwa352CorrelatorControl(xconf['xhosts'], npipeline_per_host=xconf['xnpipeline'])
-        ## QUESTION: p controls all pipelines on all hosts?
         
         p.stop_pipelines()   # stop before starting
         p.start_pipelines() 
         print(f'pipelines up? {p.pipelines_are_up()}')
         self.logger.info(f'pipelines up? {p.pipelines_are_up()}')
 
-        # QUESTION: is this standard after start_pipelines?
-        p.configure_corr(dest_ip=xconf['x_dest_corr_ip'], dest_port=xconf['x_dest_corr_port'])
+        p.configure_corr(dest_ip=xconf['x_dest_corr_ip'], dest_port=xconf['x_dest_corr_port'])  # iterates over all slow corr outputs
+        #p.corr_output_part.set_destination(?)   # fast (partial) correlator output?
 
-        # QUESTION: how to identify whether beamformed data is being produced?
-        for p in pipelines:   # QUESTION: how to list all pipelines?
-            p.beamform_output.set_destination(xconf['x_dest_beam_ip'], xconf['x_dest_beam_port']) # 1 power beam
-            for b in range(2):  # two pols
-                for i in range(352):
-                    s0 = 1 if b == 0 and i == 2 else 0
-                    s1 = 1 if b == 1 and i == 2 else 0
-                    p.beamform.update_calibration_gains(b, 2*i+0, s0*np.ones(96, dtype=np.complex64))
-                    p.beamform.update_calibration_gains(b, 2*i+1, s1*np.ones(96, dtype=np.complex64))
-                    p.beamform.update_delays(b, np.zeros(352*2))
+        for pipe in p.pipelines:
+            pipe.beamform_output.set_destination(xconf['x_dest_beam_ip'], xconf['x_dest_beam_port']) # 1 power beam
+#            for b in range(2):  # two pols
+#                for i in range(352):
+#                    s0 = 1 if b == 0 and i == 2 else 0
+#                    s1 = 1 if b == 1 and i == 2 else 0
+#                    pipe.beamform.update_calibration_gains(b, 2*i+0, s0*np.ones(96, dtype=np.complex64))
+#                    pipe.beamform.update_calibration_gains(b, 2*i+1, s1*np.ones(96, dtype=np.complex64))
+#                    pipe.beamform.update_delays(b, np.zeros(352*2))
 
     def stop_xengine(self):
         """ Stop xengines listed in configuration file.
