@@ -133,7 +133,7 @@ def chan_to_freq(chan):
     Convert a channel number to a frequency in Hz.
     """
     
-    return CHAN_BW*(chan + 0.5)
+    return CHAN_BW*chan
 
 
 def freq_to_chan(freq):
@@ -141,7 +141,7 @@ def freq_to_chan(freq):
     Convert a frequency in Hz to a channel number.
     """
     
-    return int(freq / CHAN_BW + 0.5)
+    return int(round(freq / CHAN_BW))
 
 
 def quota_size(value):
