@@ -1,8 +1,16 @@
 import numpy as np
 import yaml
 from lwautils import lwa_arx   # arx
-from lwa_f import snap2_fengine, helpers  # fengine
-from lwa352_pipeline_control import Lwa352CorrelatorControl  # xengine
+import logging
+
+try:
+    from lwa_f import snap2_fengine, helpers  # fengine
+except ImportError:
+    print('No f-eng library found. Skipping.')
+try:
+    from lwa352_pipeline_control import Lwa352CorrelatorControl  # xengine
+except ImportError:
+    print('No x-eng library found. Skipping.')
 from mnc import ezdr  # dr
 
 
@@ -11,9 +19,13 @@ class Controller():
     Ideally, will also make it easy to monitor basic system status.
     """
 
-    self.logger = logger or helpers.add_default_log_handlers(logging.getLogger(__name__ + ":%s" % (host)))
-
     def __init__(self, config_file='lwa_config.yaml', **kwargs):
+        try:
+            self.logger = helpers.add_default_log_handlers(logging.getLogger(__name__ + ":%s" % (host)))
+        except:
+            logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
+
+        self.logger = logging.getLogger(__name__)
         self.config_file = config_file
 
         with open(config_file, 'r') as fh:
