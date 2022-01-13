@@ -99,7 +99,7 @@ class LWATime(AstroTime):
         Return a LWA timetag (ticks of a FS clock since the unix epoch).
         """
         
-        sec1 = (self.jd1 - 2440588.0)*86400
+        sec1 = (self.jd1 - 2440587.5)*86400
         sec2 = self.jd2*86400
         sec = int(sec1) + int(sec2)
         frac = (sec1) - int(sec1) + sec2 - int(sec2)
