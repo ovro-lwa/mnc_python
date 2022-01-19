@@ -7,6 +7,6 @@ def get_exp(uri):
     df.antname = df.antname.apply(lambda x: int(x.split('-')[1]))
     df.rename(columns={'antname': 'antnum'}, inplace=True)
     df = df[['antnum', 'pola_fee', 'polb_fee', 'arx_address', 'pola_arx_channel', 'polb_arx_channel', 'snap2_hostname',
-             'pola_digitizer_channel', 'polb_digitizer_channel']]
+             'pola_digitizer_channel', 'polb_digitizer_channel', 'pola_fpga_num', 'polb_fpga_num', 'corr_num']]
 
     return hiplot.Experiment.from_dataframe(df)
