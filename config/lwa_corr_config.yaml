@@ -1,57 +1,57 @@
 arx:
-    adrs: [24, 25, 26, 27, 28, 29, 30, 31, 32, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45]
+    adrs: [11, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45]
     preset: 1
 
 fengines:
-    snap2s_inuse: ['snap09', 'snap10', 'snap11']
+    snap2s_inuse: ["snap02", "snap03", "snap04", "snap05", "snap06", "snap07", "snap08", "snap09", "snap10", "snap11"]
     chans_per_packet: 96
     snap01:
         ants: [0, 32]
-        gbe: '10.41.0.101'
+        gbe: "10.41.0.101"
         source_port: 10000
     snap03:
         ants: [32, 64]
-        gbe: '10.41.0.102'
+        gbe: "10.41.0.102"
         source_port: 10000
     snap04:
         ants: [64, 96]
-        gbe: '10.41.0.103'
+        gbe: "10.41.0.103"
         source_port: 10000
     snap05:
         ants: [96, 128]
-        gbe: '10.41.0.104'
+        gbe: "10.41.0.104"
         source_port: 10000
     snap06:
         ants: [128, 160]
-        gbe: '10.41.0.105'
+        gbe: "10.41.0.105"
         source_port: 10000
     snap07:
         ants: [160, 192]
-        gbe: '10.41.0.106'
+        gbe: "10.41.0.106"
         source_port: 10000
     snap08:
         ants: [192, 224]
-        gbe: '10.41.0.107'
+        gbe: "10.41.0.107"
         source_port: 10000
     snap09:
         ants: [224, 256]
-        gbe: '10.41.0.108'
+        gbe: "10.41.0.108"
         source_port: 10000
     snap10:
         ants: [256, 288]
-        gbe: '10.41.0.109'
+        gbe: "10.41.0.109"
         source_port: 10000
     snap11:
         ants: [288, 320]
-        gbe: '10.41.0.110'
+        gbe: "10.41.0.110"
         source_port: 10000
     snap12:
         ants: [320, 352]
-        gbe: '10.41.0.111'
+        gbe: "10.41.0.111"
         source_port: 10000
 
 xengines:
-  xhosts: ['lxdlwagpu01', 'lxdlwagpu02', 'lxdlwagpu03', 'lxdlwagpu04', 'lxdlwagpu05', 'lxdlwagpu06', 'lxdlwagpu07', 'lxdlwagpu08']
+  xhosts: ["lxdlwagpu01", "lxdlwagpu02", "lxdlwagpu03", "lxdlwagpu04", "lxdlwagpu05", "lxdlwagpu06", "lxdlwagpu07", "lxdlwagpu08"]
   nxpipeline: 4
   arp:
     # lwa-gpu01
@@ -119,10 +119,13 @@ xengines:
     10.41.0.24-20000: [3424, 3520]
     10.41.0.40-10000: [3520, 3616]
     10.41.0.40-20000: [3616, 3712]
-  x_dest_corr_ip: ['10.41.0.25', '10.41.0.25', '10.41.0.41', '10.41.0.41']
-  x_dest_corr_port: [10001, 10001, 10001, 10001, 10002, 10002, 10002, 10002, 10003, 10003, 10003, 10003, 10004, 10004, 10004, 10004, 10005, 10005, 10005, 10005, 10006, 10006, 10006, 10006, 10007, 10007, 10007, 10007, 10008, 10008, 10008, 10008]
-  x_dest_beam_ip: ['10.41.0.19', '0.0.0.0', '0.0.0.0', '0.0.0.0', '0.0.0.0', '0.0.0.0', '0.0.0.0', '0.0.0.0', '0.0.0.0', '0.0.0.0', '0.0.0.0', '0.0.0.0', '0.0.0.0', '0.0.0.0', '0.0.0.0', '0.0.0.0']
+  x_dest_corr_name: ["lxdlwagpu09"]
+  x_dest_beam_ip: ["10.41.0.19", "0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0"]
   x_dest_beam_port: [20001]
 
+drip_mapping:
+  lxdlwagpu09: ["10.41.0.25", "10.41.0.72"]
+
 dr:
-    recorders = ['slow'] # slow, fast, power, voltage
+  recorders: ["slow"] # slow, fast, power, voltage
+

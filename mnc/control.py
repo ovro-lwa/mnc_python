@@ -1,7 +1,11 @@
 import numpy as np
 import yaml
-from lwautils import lwa_arx   # arx
 import logging
+import matplotlib
+
+from lwautils import lwa_arx   # arx
+
+matplotlib.use('Agg')
 
 try:
     from lwa_f import snap2_fengine, helpers  # fengine
@@ -19,7 +23,7 @@ class Controller():
     Ideally, will also make it easy to monitor basic system status.
     """
 
-    def __init__(self, config_file='lwa_config.yaml', **kwargs):
+    def __init__(self, config_file='lwa_config.yaml', xhosts=None, npipeline=None):
         try:
             self.logger = helpers.add_default_log_handlers(logging.getLogger(__name__ + ":%s" % (host)))
         except:
@@ -28,26 +32,52 @@ class Controller():
         self.logger = logging.getLogger(__name__)
         self.config_file = config_file
 
+        conf = self.parse_config(config_file)
+
+        self.conf = conf
+
+        self.set_properties(xhosts=xhosts, npipeline=npipeline)
+
+    def set_properties(self, xhosts=None, npipeline=None):
+        """ Set x-engine hosts and number of pipelines, then recalculate config properties.
+        """
+
+        self.xhosts = xhosts
+        if self.xhosts is None:
+            self.xhosts = self.conf["xengines"]["xhosts"]
+        self.nhosts = len(self.xhosts)
+
+        if npipeline is None:
+            self.npipeline = self.conf["xengines"]["nxpipeline"]
+        else:
+            self.npipeline = npipeline
+
+        drip_mapping = self.conf["drip_mapping"]
+        drips = [ip for name in self.conf["xengines"]["x_dest_corr_name"] for ip in drip_mapping[name]]
+        self.x_dest_corr_ip = list(sorted(drips*(self.npipeline//2)))
+        self.x_dest_corr_port = [10001+i//self.npipeline for i in range(self.npipeline*self.nhosts)]
+
+        # beamforming
+        self.x_dest_beam_ip = self.conf["xengines"]["x_dest_beam_ip"]
+        self.x_dest_beam_port = self.conf["xengines"]["x_dest_beam_port"]
+
+    @staticmethod
+    def parse_config(config_file):
+        """ Parse yaml format config_file and return dict
+        """
+
         with open(config_file, 'r') as fh:
             conf = yaml.load(fh, Loader=yaml.CSafeLoader)
         if 'fengines' not in conf:
-            self.logger.error("No 'fengines' key in output configuration!")
             raise RuntimeError('Config file missing "fengines" key')
         if 'xengines' not in conf:
-            self.logger.error("No 'xengines' key in output configuration!")
             raise RuntimeError('Config file missing "xengines" key')
         if 'arx' not in conf:
-            self.logger.error("No 'arx' key in output configuration!")
             raise RuntimeError('Config file missing "arx" key')
         if 'dr' not in conf:
-            self.logger.error("No 'dr' key in output configuration!")
             raise RuntimeError('Config file missing "dr" key')
 
-        # TODO: overload with kwargs
-        for key, value in kwargs.items():
-            print(key, value)
-            
-        self.conf = conf
+        return conf
 
     def set_arx(self, preset=None):
         """ Set ARX to preset config.
@@ -84,8 +114,10 @@ class Controller():
 
         for snap2name in snap2names:
             f = snap2_fengine.Snap2Fengine(snap2name)
+
             if program and f.fpga.is_programmed():
                 print(f'{snap2name} is already programmed.')
+
             if f.is_connected() and not force:
                 print(f'{snap2name} is already connected.')
                 continue
@@ -117,18 +149,18 @@ class Controller():
         xconf = self.conf['xengines']
 
         # one p object controls all products on given subband
-        p = Lwa352CorrelatorControl(xconf['xhosts'], npipeline_per_host=xconf['xnpipeline'])
+        p = Lwa352CorrelatorControl(self.xhosts, npipeline_per_host=self.npipeline)
         
         p.stop_pipelines()   # stop before starting
         p.start_pipelines() 
         print(f'pipelines up? {p.pipelines_are_up()}')
         self.logger.info(f'pipelines up? {p.pipelines_are_up()}')
 
-        p.configure_corr(dest_ip=xconf['x_dest_corr_ip'], dest_port=xconf['x_dest_corr_port'])  # iterates over all slow corr outputs
+        p.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_port)  # iterates over all slow corr outputs
         #p.corr_output_part.set_destination(?)   # fast (partial) correlator output?
 
         for pipe in p.pipelines:
-            pipe.beamform_output.set_destination(xconf['x_dest_beam_ip'], xconf['x_dest_beam_port']) # 1 power beam
+            pipe.beamform_output.set_destination(self.x_dest_beam_ip, self.x_dest_beam_port) # 1 power beam
 #            for b in range(2):  # two pols
 #                for i in range(352):
 #                    s0 = 1 if b == 0 and i == 2 else 0
@@ -141,9 +173,8 @@ class Controller():
         """ Stop xengines listed in configuration file.
         """
 
-        xconf = self.conf['xengines']
-        p = Lwa352CorrelatorControl(xconf['xhosts'], npipeline_per_host=xconf['xnpipeline'])
-        p.stop_pipeline()
+        p = Lwa352CorrelatorControl(self.xhosts, npipeline_per_host=self.npipeline)
+        p.stop_pipelines()
 
     def start_dr(self, recorders=None):
         """ Start data recorders listed recorders.
@@ -152,7 +183,7 @@ class Controller():
 
         # uses ezdr auto-discovery 'slow', 'fast', 'power', 'voltage'
         dconf = self.conf['dr']
-        if not recorders:
+        if recorders is None:
             recorders = dconf['recorders']
 
         # start ms writing
