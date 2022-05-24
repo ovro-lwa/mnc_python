@@ -18,7 +18,7 @@ from astropy.constants import c as speedOfLight
 speedOfLight = speedOfLight.to('m/ns').value
 
 from mnc.common import NPIPELINE, chan_to_freq
-from station import ovro
+from mnc.station import ovro
 
 
 NCHAN_PIPELINE = 96
