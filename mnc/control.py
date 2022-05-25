@@ -15,7 +15,8 @@ try:
     from lwa352_pipeline_control import Lwa352CorrelatorControl  # xengine
 except ImportError:
     print('No x-eng library found. Skipping.')
-from mnc import ezdr  # dr
+
+from mnc import ezdr, xengine_beamformer_control
 
 
 class Controller():
@@ -169,6 +170,32 @@ class Controller():
 #                    pipe.beamform.update_calibration_gains(b, 2*i+1, s1*np.ones(96, dtype=np.complex64))
 #                    pipe.beamform.update_delays(b, np.zeros(352*2))
 
+    def start_xengine_bf(self, num=1, target=None, track=False):
+        """
+        """
+
+        import glob
+
+        c = BeamPointingControl(num)
+        calfiles = glob.glob(self.xhosts['calfiles'])
+        for calfile in calfiles: 
+            try: 
+                c.set_beam_calibration(calfile) 
+            except Exception as e: 
+                print(“ERROR: %s” % str(e))
+
+        c.set_beam_dest()
+        if target is None:
+            c.set_beam_pointing(0, 90)
+        else:
+            c.set_beam_target(target)  # one-time
+
+        if track and target is not None:
+            t = BeamTracker(c, update_interval=self.xhosts['update_interval'])
+            t.track(target)
+        if track and target is None:
+            print("Must input target to track.")
+
     def stop_xengine(self):
         """ Stop xengines listed in configuration file.
         """
@@ -176,9 +203,10 @@ class Controller():
         p = Lwa352CorrelatorControl(self.xhosts, npipeline_per_host=self.npipeline)
         p.stop_pipelines()
 
-    def start_dr(self, recorders=None):
+    def start_dr(self, recorders=None, duration=None):
         """ Start data recorders listed recorders.
         Defaults to starting those listed in configuration file.
+        duration is power beam recording in seconds.
         """
 
         # uses ezdr auto-discovery 'slow', 'fast', 'power', 'voltage'
@@ -187,10 +215,25 @@ class Controller():
             recorders = dconf['recorders']
 
         # start ms writing
+        badresults = []
         for recorder in recorders:
             lwa_drc = ezdr.Lwa352RecorderControl(recorder)
             lwa_drc.print_status()   # TODO: send to self.logger
-            lwa_drc.start()
+            if recorder == 'power':
+                if duration is not None:
+                    d.record(duration=duration)
+                else:
+                    print("power beam needs duration")
+            elif recorder == 'slow':
+                results = lwa_drc.start()
+                for result in results:
+                    if result[1]['status'] != 'success':
+                        badresults.append(result[1]['response'])
+
+        if len(badresults):
+            print("Data recorder not started successfully. Responses:")
+            print(badresults)
+            
 
     def stop_dr(self, recorders=None):
         """ Stop data recorders in list recorders.
