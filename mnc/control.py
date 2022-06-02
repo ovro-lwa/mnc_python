@@ -171,10 +171,20 @@ class Controller():
 #                    pipe.beamform.update_delays(b, np.zeros(352*2))
 
     def start_xengine_bf(self, num=1, target=None, track=False):
-        """
+        """ Starts the xengine for beamformer observation.
+        num refers to the beamformer number (1 through 4).
+        target can be:
+         - source name ('zenith', 'sun') or
+         - tuple of (ra, dec) in (hourangle, degrees).
         """
 
         import glob
+
+        if isinstance(target, tuple):
+            ra, dec = target
+        elif isinstance(target, str):
+            ra = target
+            dec = None
 
         c = BeamPointingControl(num)
         calfiles = glob.glob(self.xhosts['calfiles'])
@@ -184,16 +194,18 @@ class Controller():
             except Exception as e: 
                 print(“ERROR: %s” % str(e))
 
+        # one-time commands to point
         c.set_beam_dest()
         if target is None:
             c.set_beam_pointing(0, 90)
         else:
-            c.set_beam_target(target)  # one-time
+            c.set_beam_target(ra, dec=dec)
 
+        # track
         if track and target is not None:
             t = BeamTracker(c, update_interval=self.xhosts['update_interval'])
             t.track(target)
-        if track and target is None:
+        elif track and target is None:
             print("Must input target to track.")
 
     def stop_xengine(self):
