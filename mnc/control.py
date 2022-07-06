@@ -26,7 +26,7 @@ class Controller():
 
     def __init__(self, config_file='lwa_config.yaml', xhosts=None, npipeline=None):
         try:
-            self.logger = helpers.add_default_log_handlers(logging.getLogger(__name__ + ":%s" % (host)))
+            self.logger = helpers.add_default_log_handlers(logging.getLogger(f"{__name__}:{host}"))
         except:
             logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
@@ -192,7 +192,7 @@ class Controller():
             try: 
                 c.set_beam_calibration(calfile) 
             except Exception as e: 
-                print(“ERROR: %s” % str(e))
+                print(f"ERROR: {e}")
 
         # one-time commands to point
         c.set_beam_dest()
