@@ -22,9 +22,10 @@ from mnc import ezdr, xengine_beamformer_control
 class Controller():
     """ Parse configuration and control all subsystems in uniform manner.
     Ideally, will also make it easy to monitor basic system status.
+    etcdhost is used by x-engine. data recorders use value set in mnc/common.py code.
     """
 
-    def __init__(self, config_file='lwa_config.yaml', xhosts=None, npipeline=None):
+    def __init__(self, config_file='lwa_config.yaml', etcdhost=None, xhosts=None, npipeline=None):
         try:
             self.logger = helpers.add_default_log_handlers(logging.getLogger(f"{__name__}:{host}"))
         except:
@@ -36,31 +37,10 @@ class Controller():
         conf = self.parse_config(config_file)
 
         self.conf = conf
-
-        self.set_properties(xhosts=xhosts, npipeline=npipeline)
-
-    def set_properties(self, xhosts=None, npipeline=None):
-        """ Set x-engine hosts and number of pipelines, then recalculate config properties.
-        """
-
+        self.etcdhost = etcdhost
         self.xhosts = xhosts
-        if self.xhosts is None:
-            self.xhosts = self.conf["xengines"]["xhosts"]
-        self.nhosts = len(self.xhosts)
-
-        if npipeline is None:
-            self.npipeline = self.conf["xengines"]["nxpipeline"]
-        else:
-            self.npipeline = npipeline
-
-        drip_mapping = self.conf["drip_mapping"]
-        drips = [ip for name in self.conf["xengines"]["x_dest_corr_name"] for ip in drip_mapping[name]]
-        self.x_dest_corr_ip = list(sorted(drips*(self.npipeline//2)))
-        self.x_dest_corr_port = [10001+i//self.npipeline for i in range(self.npipeline*self.nhosts)]
-
-        # beamforming
-        self.x_dest_beam_ip = self.conf["xengines"]["x_dest_beam_ip"]
-        self.x_dest_beam_port = self.conf["xengines"]["x_dest_beam_port"]
+        self.npipeline = npipeline
+        self.set_properties()
 
     @staticmethod
     def parse_config(config_file):
@@ -77,8 +57,30 @@ class Controller():
             raise RuntimeError('Config file missing "arx" key')
         if 'dr' not in conf:
             raise RuntimeError('Config file missing "dr" key')
+        if 'etcd' not in conf:
+            raise RuntimeError('Config file missing "etcd" key')
 
         return conf
+
+    def set_properties(self):
+        """ Set properties, then recalculate config properties.
+        """
+
+        if self.xhosts is None:
+            self.xhosts = self.conf["xengines"]["xhosts"]
+        self.nhosts = len(self.xhosts)
+
+        if npipeline is None:
+            self.npipeline = self.conf["xengines"]["nxpipeline"]
+
+        drip_mapping = self.conf["drip_mapping"]
+        drips = [ip for name in self.conf["xengines"]["x_dest_corr_name"] for ip in drip_mapping[name]]
+        self.x_dest_corr_ip = list(sorted(drips*(self.npipeline//2)))
+        self.x_dest_corr_port = [10001+i//self.npipeline for i in range(self.npipeline*self.nhosts)]
+
+        # beamforming
+        self.x_dest_beam_ip = self.conf["xengines"]["x_dest_beam_ip"]
+        self.x_dest_beam_port = self.conf["xengines"]["x_dest_beam_port"]
 
     def set_arx(self, preset=None):
         """ Set ARX to preset config.
@@ -89,7 +91,7 @@ class Controller():
         if preset is None:
             preset = aconf['preset']
 
-        ma = lwa_arx.ARX() 
+        ma = lwa_arx.ARX()   # TODO: update to use self.etcdhost
         for adr in aconf['adrs']:
             ma.load_cfg(adr, preset)
 
@@ -150,7 +152,7 @@ class Controller():
         xconf = self.conf['xengines']
 
         # one p object controls all products on given subband
-        p = Lwa352CorrelatorControl(self.xhosts, npipeline_per_host=self.npipeline)
+        p = Lwa352CorrelatorControl(self.xhosts, npipeline_per_host=self.npipeline, etcdhost=self.etcdhost)
         
         p.stop_pipelines()   # stop before starting
         p.start_pipelines() 
@@ -212,7 +214,7 @@ class Controller():
         """ Stop xengines listed in configuration file.
         """
 
-        p = Lwa352CorrelatorControl(self.xhosts, npipeline_per_host=self.npipeline)
+        p = Lwa352CorrelatorControl(self.xhosts, npipeline_per_host=self.npipeline, etcdhost=self.etcdhost)
         p.stop_pipelines()
 
     def start_dr(self, recorders=None, duration=None):
