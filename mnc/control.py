@@ -7,6 +7,7 @@ from lwautils import lwa_arx   # arx
 
 matplotlib.use('Agg')
 
+
 try:
     from lwa_f import snap2_fengine, helpers  # fengine
 except ImportError:
@@ -25,7 +26,7 @@ class Controller():
     etcdhost is used by x-engine. data recorders use value set in mnc/common.py code.
     """
 
-    def __init__(self, config_file='lwa_config.yaml', etcdhost=None, xhosts=None, npipeline=None):
+    def __init__(self, config_file='config/lwa_config.yaml', etcdhost=None, xhosts=None, npipeline=None):
         try:
             self.logger = helpers.add_default_log_handlers(logging.getLogger(f"{__name__}:{host}"))
         except:
@@ -66,11 +67,15 @@ class Controller():
         """ Set properties, then recalculate config properties.
         """
 
+        if self.etcdhost is None:
+            self.etcdhost = self.conf["etcd"]["host"]
+            # TODO: also use port?
+
         if self.xhosts is None:
             self.xhosts = self.conf["xengines"]["xhosts"]
         self.nhosts = len(self.xhosts)
 
-        if npipeline is None:
+        if self.npipeline is None:
             self.npipeline = self.conf["xengines"]["nxpipeline"]
 
         drip_mapping = self.conf["drip_mapping"]
