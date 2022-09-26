@@ -1,6 +1,7 @@
-import numpy as np
 import yaml
 import logging
+import glob
+import numpy as np
 import matplotlib
 
 from lwautils import lwa_arx   # arx
@@ -185,16 +186,14 @@ class Controller():
          - tuple of (ra, dec) in (hourangle, degrees).
         """
 
-        import glob
-
         if isinstance(target, tuple):
             ra, dec = target
         elif isinstance(target, str):
             ra = target
             dec = None
 
-        c = BeamPointingControl(num)
-        calfiles = glob.glob(self.xhosts['calfiles'])
+        c = xengine_beamformer_control.BeamPointingControl(num)
+        calfiles = glob.glob(self.conf['xengines']['calfiles'])
         for calfile in calfiles: 
             try: 
                 c.set_beam_calibration(calfile) 
@@ -210,7 +209,7 @@ class Controller():
 
         # track
         if track and target is not None:
-            t = BeamTracker(c, update_interval=self.xhosts['update_interval'])
+            t = xengine_beamformer_control.BeamTracker(c, update_interval=self.xhosts['update_interval'])
             t.track(target)
         elif track and target is None:
             print("Must input target to track.")
