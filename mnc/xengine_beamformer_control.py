@@ -21,7 +21,7 @@ speedOfLight = speedOfLight.to('m/ns').value
 
 from lwa_antpos.station import ovro
 
-from mnc.common import NPIPELINE, chan_to_freq
+from mnc.common import NPIPELINE, chan_to_freq, ETCD_HOST
 
 
 NCHAN_PIPELINE = 96
@@ -123,7 +123,7 @@ class BeamPointingControl(object):
         self.pipelines = []
         for hostname in servers:
             for i in range(npipeline_per_server):
-                p = Lwa352PipelineControl(hostname, i, etcdhost='etcdv3service')
+                p = Lwa352PipelineControl(hostname, i, etcdhost=ETCD_HOST)
                 self.pipelines.append(p)
                 
         # Query the pipelines to figure out the frequency ranges they are sending

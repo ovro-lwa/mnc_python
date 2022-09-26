@@ -1,6 +1,7 @@
-import numpy as np
 import yaml
 import logging
+import glob
+import numpy as np
 import matplotlib
 import glob
 
@@ -199,7 +200,7 @@ class Controller():
             dec = 90
 
         c = xengine_beamformer_control.BeamPointingControl(num)
-        calfiles = glob.glob(self.xhosts['calfiles'])
+        calfiles = glob.glob(self.conf['xengines']['calfiles'])
         for calfile in calfiles: 
             try: 
                 c.set_beam_calibration(calfile) 
