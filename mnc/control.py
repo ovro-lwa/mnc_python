@@ -2,6 +2,7 @@ import numpy as np
 import yaml
 import logging
 import matplotlib
+import glob
 
 from lwautils import lwa_arx   # arx
 
@@ -80,9 +81,13 @@ class Controller():
 
         drip_mapping = self.conf["drip_mapping"]
         drips = [ip for name in self.conf["xengines"]["x_dest_corr_name"] for ip in drip_mapping[name]]
-        self.x_dest_corr_ip = list(sorted(drips*(self.npipeline//2)))
-        self.x_dest_corr_port = [10001+i//self.npipeline for i in range(self.npipeline*self.nhosts)]
-
+# on gpu9
+#        self.x_dest_corr_ip = list(sorted(drips*(self.npipeline//2)))
+#        self.x_dest_corr_port = [10001+i//self.npipeline for i in range(self.npipeline*self.nhosts)]
+# on calim0
+        self.x_dest_corr_ip = list(sorted(drips*(self.npipeline)))
+        self.x_dest_corr_slow_port = [10001, 10001, 10002, 10002]
+        self.x_dest_corr_slow_port = [11001, 11001, 11002, 11002]
         # beamforming
         self.x_dest_beam_ip = self.conf["xengines"]["x_dest_beam_ip"]
         self.x_dest_beam_port = self.conf["xengines"]["x_dest_beam_port"]
@@ -164,20 +169,18 @@ class Controller():
         print(f'pipelines up? {p.pipelines_are_up()}')
         self.logger.info(f'pipelines up? {p.pipelines_are_up()}')
 
-        p.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_port)  # iterates over all slow corr outputs
-        #p.corr_output_part.set_destination(?)   # fast (partial) correlator output?
+        # slow
+        if 'slow' in self.conf['dr']['recorders']:
+            p.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_slow_port)  # iterates over all slow corr outputs
 
-        for pipe in p.pipelines:
-            pipe.beamform_output.set_destination(self.x_dest_beam_ip, self.x_dest_beam_port) # 1 power beam
-#            for b in range(2):  # two pols
-#                for i in range(352):
-#                    s0 = 1 if b == 0 and i == 2 else 0
-#                    s1 = 1 if b == 1 and i == 2 else 0
-#                    pipe.beamform.update_calibration_gains(b, 2*i+0, s0*np.ones(96, dtype=np.complex64))
-#                    pipe.beamform.update_calibration_gains(b, 2*i+1, s1*np.ones(96, dtype=np.complex64))
-#                    pipe.beamform.update_delays(b, np.zeros(352*2))
+        if 'fast' in self.conf['dr']['recorders']:
+            for i in range(self.npipeline*self.nhosts):
+                p.pipelines[i].corr_output_part.set_destination(self.x_dest_corr_ip[i], self.x_dest_corr_fast_port[i%4])
 
-    def start_xengine_bf(self, num=1, target=None, track=False):
+        if 'power' in self.conf['dr']['recorders']:
+            print('Start power beams with "start_xengine_bf" method"')
+
+    def start_xengine_bf(self, num=1, target=None, track=True):
         """ Starts the xengine for beamformer observation.
         num refers to the beamformer number (1 through 4).
         target can be:
@@ -185,15 +188,17 @@ class Controller():
          - tuple of (ra, dec) in (hourangle, degrees).
         """
 
-        import glob
-
         if isinstance(target, tuple):
             ra, dec = target
         elif isinstance(target, str):
             ra = target
             dec = None
+        else:
+            print("No target specified. Pointing at zenith.")
+            ra = 0
+            dec = 90
 
-        c = BeamPointingControl(num)
+        c = xengine_beamformer_control.BeamPointingControl(num)
         calfiles = glob.glob(self.xhosts['calfiles'])
         for calfile in calfiles: 
             try: 
@@ -210,7 +215,7 @@ class Controller():
 
         # track
         if track and target is not None:
-            t = BeamTracker(c, update_interval=self.xhosts['update_interval'])
+            t = xengine_beamformer_control.BeamTracker(c, update_interval=self.xhosts['update_interval'])
             t.track(target)
         elif track and target is None:
             print("Must input target to track.")
@@ -240,10 +245,10 @@ class Controller():
             lwa_drc.print_status()   # TODO: send to self.logger
             if recorder == 'power':
                 if duration is not None:
-                    d.record(duration=duration)
+                    lwa_drc.record(duration=duration)
                 else:
                     print("power beam needs duration")
-            elif recorder == 'slow':
+            elif recorder in ['slow', 'fast']:
                 results = lwa_drc.start()
                 for result in results:
                     if result[1]['status'] != 'success':
