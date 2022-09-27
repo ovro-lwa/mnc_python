@@ -216,7 +216,7 @@ class Controller():
 
         # track
         if track and target is not None:
-            t = xengine_beamformer_control.BeamTracker(c, update_interval=self.xhosts['update_interval'])
+            t = xengine_beamformer_control.BeamTracker(c, update_interval=self.conf['xengines']['update_interval'])
             t.track(target)
         elif track and target is None:
             print("Must input target to track.")
