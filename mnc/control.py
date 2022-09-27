@@ -44,6 +44,7 @@ class Controller():
         self.xhosts = xhosts
         self.npipeline = npipeline
         self.set_properties()
+        self.pipelines = None
 
     @staticmethod
     def parse_config(config_file):
@@ -164,7 +165,8 @@ class Controller():
 
         # one p object controls all products on given subband
         p = Lwa352CorrelatorControl(self.xhosts, npipeline_per_host=self.npipeline, etcdhost=self.etcdhost)
-        
+        self.pipelines = p.pipelines
+
         p.stop_pipelines()   # stop before starting
         p.start_pipelines() 
         print(f'pipelines up? {p.pipelines_are_up()}')
@@ -199,7 +201,7 @@ class Controller():
             ra = 0
             dec = 90
 
-        c = xengine_beamformer_control.BeamPointingControl(num)
+        c = xengine_beamformer_control.BeamPointingControl(num, servers=self.xhosts, npipeline_per_server=self.npipeline)
         calfiles = glob.glob(self.conf['xengines']['calfiles'])
         for calfile in calfiles: 
             try: 
@@ -208,7 +210,8 @@ class Controller():
                 print(f"ERROR: {e}")
 
         # one-time commands to point
-        c.set_beam_dest()
+        c.set_beam_dest(addr==self.conf['xengines']['x_dest_beam_port'][num-1],
+                        port=self.conf['xengines']['x_dest_beam_port'][num-1])
         if target is None:
             c.set_beam_pointing(0, 90)
         else:
