@@ -129,7 +129,7 @@ xengines:
   x_dest_corr_fast_port: [11001, 11001, 11002, 11002]
   x_dest_beam_ip: None
   x_dest_beam_port: None
-  calfiles: "/home/pipeline/caltables/latest/*.bcal"
+  cal_directory: "/home/pipeline/caltables/latest/"
   update_interval: 15  # beamformer tracking update cadence in seconds
 
 drip_mapping:
