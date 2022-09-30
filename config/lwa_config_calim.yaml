@@ -125,9 +125,11 @@ xengines:
     10.41.0.40-10000: [3520, 3616]
     10.41.0.40-20000: [3616, 3712]
   x_dest_corr_name: ["lwacalim01", "lwacalim02", "lwacalim03", "lwacalim04", "lwacalim05", "lwacalim06", "lwacalim07", "lwacalim08"]
+  x_dest_corr_slow_port: [10001, 10001, 10002, 10002]
+  x_dest_corr_fast_port: [11001, 11001, 11002, 11002]
   x_dest_beam_ip: None
   x_dest_beam_port: None
-  calfiles: "/home/pipelien/caltables/latest/*.bcal"
+  calfiles: "/home/pipeline/caltables/latest/*.bcal"
   update_interval: 15  # beamformer tracking update cadence in seconds
 
 drip_mapping:
@@ -141,5 +143,5 @@ drip_mapping:
   lwacalim08: ["10.41.0.83"]
 
 dr:
-  recorders: ["slow"] # slow, fast, power, voltage
+  recorders: ["drvs"] # drvs, drvf, dr1 (power beam)
 

@@ -4,6 +4,7 @@ import json
 import time
 import numpy
 import warnings
+import ipaddress
 import progressbar
 from threading import RLock
 from textwrap import fill as tw_fill
@@ -99,7 +100,7 @@ class BeamPointingControl(object):
     Class to provide high level control over a beam.
     """
     
-    def __init__(self, beam, servers=None, nserver=8, npipeline_per_server=4, station=ovro):
+    def __init__(self, beam, servers=None, nserver=8, npipeline_per_server=4, station=ovro, etcdhost=ETCD_HOST):
         # Validate
         assert(beam in list(range(1,16+1)))
         assert(nserver <= NSERVER)
@@ -123,7 +124,7 @@ class BeamPointingControl(object):
         self.pipelines = []
         for hostname in servers:
             for i in range(npipeline_per_server):
-                p = Lwa352PipelineControl(hostname, i, etcdhost=ETCD_HOST)
+                p = Lwa352PipelineControl(hostname, i, etcdhost=etcdhost)
                 self.pipelines.append(p)
                 
         # Query the pipelines to figure out the frequency ranges they are sending
@@ -155,16 +156,21 @@ class BeamPointingControl(object):
         
         return all(self._cal_set)
         
-    def set_beam_dest(self, addr='10.41.0.25', port=None, port_base=20001):
+    def set_beam_dest(self, addr=None, port=None, addr_base='10.41.0.76', port_base=20001):
         """
         Set the destination IP address and UDP port for the beam data.  Defaults
         to what is currently used by the "dr-beam-N" services on lxdlwagpu09.
         """
         
+        # If an address is not explicitly provided, find what is should be using
+        # addr_base and the beam number.
+        if addr is None:
+            addr = ipaddress.IPv4Address(addr_base) + (self.beam - 1) // 2
+            addr = str(addr)
         # If a port was not explicitly provided, find what is should be using
         # port_base and the beam number.
         if port is None:
-            port = port_base + self.beam - 1
+            port = port_base + (self.beam - 1) % 2
             
         with _BEAM_DEST_LOCK:
             for p in self.pipelines:
@@ -529,7 +535,7 @@ class BeamTracker(object):
             pass
 
 
-def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4, cal_directory='/home/ubuntu/mmanders/caltables/latest/'):
+def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4, cal_directory='/home/ubuntu/mmanders/caltables/latest/', etcdhost=ETCD_HOST):
     """
     Wraper to create a new BeamPointingControl instance and load bandpass
     calibration data from a directory.
@@ -540,7 +546,8 @@ def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4, 
                                            servers=servers,
                                            nserver=nserver,
                                            npipeline_per_server=npipeline_per_server,
-                                           station=ovro)
+                                           station=ovro,
+                                           etcdhost=etcdhost)
     
     # Find the calibration files
     calfiles = glob.glob(os.path.join(cal_directory, '*.bcal'))
