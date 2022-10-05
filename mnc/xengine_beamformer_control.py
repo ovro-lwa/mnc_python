@@ -4,8 +4,11 @@ import json
 import time
 import numpy
 import warnings
+import ipaddress
 import progressbar
 from threading import RLock
+from textwrap import fill as tw_fill
+from concurrent.futures import ThreadPoolExecutor, wait as thread_pool_wait
 
 from lwa352_pipeline_control import Lwa352PipelineControl
 from casacore import tables
@@ -17,8 +20,9 @@ from astropy.coordinates import solar_system_ephemeris, get_body
 from astropy.constants import c as speedOfLight
 speedOfLight = speedOfLight.to('m/ns').value
 
-from mnc.common import NPIPELINE, chan_to_freq
 from lwa_antpos.station import ovro
+
+from mnc.common import NPIPELINE, chan_to_freq, ETCD_HOST
 
 
 NCHAN_PIPELINE = 96
@@ -30,6 +34,17 @@ NSERVER = NPIPELINE // NPIPELINE_SERVER
 
 NSTAND = 352
 NPOL = 2
+
+
+def _build_repr(name, attrs=[]):
+    name = '.'.join(name.split('.')[-2:])
+    output = "<%s" % name
+    first = True
+    for key,value in attrs:
+        output += "%s %s=%s" % (('' if first else ','), key, value)
+        first = False
+    output += ">"
+    return output
 
 
 class AllowedPipelineFailure(object):
@@ -49,6 +64,34 @@ class AllowedPipelineFailure(object):
         return True
 
 
+class PipelineTaskPool(list):
+    def __init__(self, objects=[]):
+        list.__init__(self, objects)
+        
+    def __getattr__(self, item):
+        with ThreadPoolExecutor(8) as pool:
+            results = {}
+            for i,obj in enumerate(self):
+                results[pool.submit(lambda x: getattr(x, item), obj)] = i
+        output = PipelineTaskPool([None,]*len(self))
+        for result in thread_pool_wait(results).done:
+            i = results[result]
+            output[i] = result.result()
+        return output
+        
+    def __call__(self, *args, **kwds):
+        with ThreadPoolExecutor(8) as pool:
+            results = {}
+            for i,obj in enumerate(self):
+                results[pool.submit(lambda x: x.__call__(*args, **kwds), obj)] = i
+        output = [None,]*len(self)
+        for result in thread_pool_wait(results).done:
+            i = results[result]
+            with AllowedPipelineFailure(self[i].__self__):
+                output[i] = result.result()
+        return output
+
+
 _BEAM_DEST_LOCK = RLock()
 
 
@@ -57,7 +100,7 @@ class BeamPointingControl(object):
     Class to provide high level control over a beam.
     """
     
-    def __init__(self, beam, servers=None, nserver=8, npipeline_per_server=4, station=ovro):
+    def __init__(self, beam, servers=None, nserver=8, npipeline_per_server=4, station=ovro, etcdhost=ETCD_HOST):
         # Validate
         assert(beam in list(range(1,16+1)))
         assert(nserver <= NSERVER)
@@ -81,7 +124,7 @@ class BeamPointingControl(object):
         self.pipelines = []
         for hostname in servers:
             for i in range(npipeline_per_server):
-                p = Lwa352PipelineControl(hostname, i, etcdhost='etcdv3service')
+                p = Lwa352PipelineControl(hostname, i, etcdhost=etcdhost)
                 self.pipelines.append(p)
                 
         # Query the pipelines to figure out the frequency ranges they are sending
@@ -100,6 +143,11 @@ class BeamPointingControl(object):
         # Initially set uniform antenna weighting for a natural beam shape
         self.set_beam_weighting(lambda x: 1.0)
         
+    def __repr__(self):
+        n = self.__class__.__module__+'.'+self.__class__.__name__
+        a = [(attr,getattr(self, attr, None)) for attr in ('beam',)]
+        return tw_fill(_build_repr(n,a), subsequent_indent='    ')
+        
     @property
     def cal_set(self):
         """
@@ -108,12 +156,22 @@ class BeamPointingControl(object):
         
         return all(self._cal_set)
         
-    def set_beam_dest(self, addr='10.41.0.25', port=20001):
+    def set_beam_dest(self, addr=None, port=None, addr_base='10.41.0.76', port_base=20001):
         """
         Set the destination IP address and UDP port for the beam data.  Defaults
-        to what is currently used by the "dr-beam-1" service on lxdlwagpu09.
+        to what is currently used by the "dr-beam-N" services on lwacalim01.
         """
         
+        # If an address is not explicitly provided, find what is should be using
+        # addr_base and the beam number.
+        if addr is None:
+            addr = ipaddress.IPv4Address(addr_base) + (self.beam - 1) // 2
+            addr = str(addr)
+        # If a port was not explicitly provided, find what is should be using
+        # port_base and the beam number.
+        if port is None:
+            port = port_base + (self.beam - 1) % 2
+            
         with _BEAM_DEST_LOCK:
             for p in self.pipelines:
                 with AllowedPipelineFailure(p):
@@ -133,10 +191,11 @@ class BeamPointingControl(object):
                     # Send them out again
                     p.beamform_output.set_destination(addrs, ports)
                     
-    def set_beam_vlbi_dest(self, addr='10.41.0.25', port=21001):
+    def set_beam_vlbi_dest(self, addr='10.41.0.73', port=21001):
         """
         Set the destination IP address and UDP port for the VLBI version of the
-        beam data.  Defaults to 10.41.0.25, port 21001 (on lxdlwagpu09).
+        beam data.  Defaults to what is currently used by the "dr-tengine"
+        service on lxdlwagpu09.
         """
         
         # Validate that this is the correct beam
@@ -197,6 +256,7 @@ class BeamPointingControl(object):
         # Find the pipelines that should correspond to the specified subband
         # TODO: Use the freuqency information to figure this out for the user
         subband_pipelines = []
+        subband_pipeline_index = []
         for i in range(NPIPELINE_SUBBAND):
             ## Get the frequency range for the pipeline in the subband and pull
             ## out the middle
@@ -208,6 +268,7 @@ class BeamPointingControl(object):
             try:
                 j = self._freq_to_pipeline(center_freq)
                 subband_pipelines.append(self.pipelines[j])
+                subband_pipeline_index.append(j)
                 if verbose:
                     print(f"Found pipeline {j} covering {self.freqs[j][0]/1e6:.3f} to {self.freqs[j][-1]/1e6:.3f} MHz")
             except ValueError:
@@ -221,7 +282,7 @@ class BeamPointingControl(object):
         # Set the coefficients - this is slow
         pb = progressbar.ProgressBar(redirect_stdout=True)
         pb.start(max_value=len(subband_pipelines)*NSTAND)
-        for i,p in enumerate(subband_pipelines):
+        for i,(p,ii) in enumerate(zip(subband_pipelines, subband_pipeline_index)):
             for j in range(NSTAND):
                 for pol in range(NPOL):
                     cal = 1./caldata[j,i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol].ravel()
@@ -233,7 +294,7 @@ class BeamPointingControl(object):
                         p.beamform.update_calibration_gains(2*(self.beam-1)+pol, NPOL*j+pol, cal)
                         time.sleep(0.005)
                 pb += 1
-            self._cal_set[i] = True
+            self._cal_set[ii] = True
         pb.finish()
         
     def set_beam_gain(self, gain):
@@ -260,7 +321,7 @@ class BeamPointingControl(object):
         self._weighting = numpy.array([fnc2(ant.enz) for ant in self.station.antennas])
         self._weighting = numpy.repeat(self._weighting, 2)
         
-    def set_beam_delays(self, delays, pol=0):
+    def set_beam_delays(self, delays, pol=0, load_time=None):
         """
         Set the beamformer delays to the specified values in ns for the given
         polarization.
@@ -275,15 +336,10 @@ class BeamPointingControl(object):
         amps *= self._weighting
         
         # Set the delays and amplitudes
-        pb = progressbar.ProgressBar(redirect_stdout=True)
-        pb.start(max_value=len(self.pipelines))
-        for p in self.pipelines:
-            with AllowedPipelineFailure(p):
-                p.beamform.update_delays(2*(self.beam-1)+pol, delays, amps)
-            pb += 1
-        pb.finish()
+        ptp = PipelineTaskPool(self.pipelines)
+        ptp.beamform.update_delays(2*(self.beam-1)+pol, delays, amps, load_time=load_time, time_unit='time')
         
-    def set_beam_pointing(self, az, alt, degrees=True):
+    def set_beam_pointing(self, az, alt, degrees=True, load_time=None):
         """
         Given a topocentric pointing in azimuth and altitude (elevation), point
         the beam in that direction.  The `degrees` keyword determines if the
@@ -320,9 +376,9 @@ class BeamPointingControl(object):
         
         # Apply
         for pol in range(NPOL):
-            self.set_beam_delays(delays, pol)
+            self.set_beam_delays(delays, pol, load_time=load_time)
             
-    def set_beam_target(self, target_or_ra, dec=None, verbose=True):
+    def set_beam_target(self, target_or_ra, dec=None, load_time=None, verbose=True):
         """
         Given the name of an astronomical target, 'sun', or 'zenith', compute the
         current topocentric position of the body and point the beam at it.  If
@@ -362,15 +418,20 @@ class BeamPointingControl(object):
                 if verbose:
                     print(f"Resolved '{target_or_ra}' to RA {sc.ra}, Dec. {sc.dec}")
                     
-            ## Figure out where it is right now
-            aa = sc.transform_to(AltAz(obstime=Time.now(), location=obs))
+            ## Figure out where it is right now (or at least at the load time)
+            if load_time is not None:
+                compute_time = Time(load_time, format='unix', scale='utc')
+            else:
+                compute_time = Time.now()
+                load_time = compute_time.utc.unix
+            aa = sc.transform_to(AltAz(obstime=compute_time, location=obs))
             az = aa.az.deg
             alt = aa.alt.deg
             if verbose:
                 print(f"Currently at azimuth {aa.az}, altitude {aa.alt}")
                 
         # Point the beam
-        self.set_beam_pointing(az, alt, degrees=True)
+        self.set_beam_pointing(az, alt, degrees=True, load_time=load_time)
 
 
 class BeamTracker(object):
@@ -380,10 +441,17 @@ class BeamTracker(object):
     """
     
     def __init__(self, control_instance, update_interval=30):
+        if not isinstance(control_instance, BeamPointingControl):
+            raise ValueError("Expected control_instance to be of type BeamPointingControl")
         self.control_instance = control_instance
         self.update_interval = update_interval
         
-    def track(self, target_or_ra, dec=None, duration=0, verbose=True):
+    def __repr__(self):
+        n = self.__class__.__module__+'.'+self.__class__.__name__
+        a = [(attr,getattr(self, attr, None)) for attr in ('control_instance', 'update_interval')]
+        return tw_fill(_build_repr(n,a), subsequent_indent='    ')
+        
+    def track(self, target_or_ra, dec=None, duration=0, start_time=None, verbose=True):
         """
         Given a target name and a tracking duration in seconds, start tracking
         the source.  If the 'dec' keyword is not None, the target is intepreted
@@ -430,7 +498,9 @@ class BeamTracker(object):
         puto = TimeDelta(min([duration, self.update_interval])/2.0, format='sec')
         
         # Set the tracking stop time    
-        t_stop = time.time() + duration
+        if start_time is None:
+            start_time = time.time()
+        t_stop = start_time + duration
         
         try:
             # Go!
@@ -448,7 +518,7 @@ class BeamTracker(object):
                     print(f"At {time.time():.1f}, moving to azimuth {aa.az}, altitude {aa.alt}")
                     
                 ## Point
-                self.control_instance.set_beam_pointing(az, alt, degrees=True)
+                self.control_instance.set_beam_pointing(az, alt, degrees=True, load_time=t_mark+2)
                 
                 ## Find how much time we used and when we should sleep until
                 t_used = time.time() - t_mark
@@ -465,7 +535,7 @@ class BeamTracker(object):
             pass
 
 
-def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4, cal_directory='/home/ubuntu/mmanders'):
+def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4, cal_directory='/home/ubuntu/mmanders/caltables/latest/', etcdhost=ETCD_HOST):
     """
     Wraper to create a new BeamPointingControl instance and load bandpass
     calibration data from a directory.
@@ -476,7 +546,8 @@ def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4, 
                                            servers=servers,
                                            nserver=nserver,
                                            npipeline_per_server=npipeline_per_server,
-                                           station=ovro)
+                                           station=ovro,
+                                           etcdhost=etcdhost)
     
     # Find the calibration files
     calfiles = glob.glob(os.path.join(cal_directory, '*.bcal'))
@@ -491,7 +562,7 @@ def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4, 
     # Start up the data flow
     control_instance.set_beam_dest()
     if control_instance.beam == 1:
-        control_instance.set_beam_vlbi_dest()
+       control_instance.set_beam_vlbi_dest()
         
     # Done
     return control_instance

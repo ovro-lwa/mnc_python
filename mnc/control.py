@@ -1,11 +1,14 @@
-import numpy as np
 import yaml
 import logging
+import glob
+import numpy as np
 import matplotlib
+import glob
 
 from lwautils import lwa_arx   # arx
 
 matplotlib.use('Agg')
+
 
 try:
     from lwa_f import snap2_fengine, helpers  # fengine
@@ -16,15 +19,16 @@ try:
 except ImportError:
     print('No x-eng library found. Skipping.')
 
-from mnc import ezdr, xengine_beamformer_control
+from mnc import mcs, xengine_beamformer_control
 
 
 class Controller():
     """ Parse configuration and control all subsystems in uniform manner.
     Ideally, will also make it easy to monitor basic system status.
+    etcdhost is used by x-engine. data recorders use value set in mnc/common.py code.
     """
 
-    def __init__(self, config_file='lwa_config.yaml', xhosts=None, npipeline=None):
+    def __init__(self, config_file='config/lwa_config.yaml', etcdhost=None, xhosts=None, npipeline=None):
         try:
             self.logger = helpers.add_default_log_handlers(logging.getLogger(f"{__name__}:{host}"))
         except:
@@ -36,31 +40,10 @@ class Controller():
         conf = self.parse_config(config_file)
 
         self.conf = conf
-
-        self.set_properties(xhosts=xhosts, npipeline=npipeline)
-
-    def set_properties(self, xhosts=None, npipeline=None):
-        """ Set x-engine hosts and number of pipelines, then recalculate config properties.
-        """
-
+        self.etcdhost = etcdhost
         self.xhosts = xhosts
-        if self.xhosts is None:
-            self.xhosts = self.conf["xengines"]["xhosts"]
-        self.nhosts = len(self.xhosts)
-
-        if npipeline is None:
-            self.npipeline = self.conf["xengines"]["nxpipeline"]
-        else:
-            self.npipeline = npipeline
-
-        drip_mapping = self.conf["drip_mapping"]
-        drips = [ip for name in self.conf["xengines"]["x_dest_corr_name"] for ip in drip_mapping[name]]
-        self.x_dest_corr_ip = list(sorted(drips*(self.npipeline//2)))
-        self.x_dest_corr_port = [10001+i//self.npipeline for i in range(self.npipeline*self.nhosts)]
-
-        # beamforming
-        self.x_dest_beam_ip = self.conf["xengines"]["x_dest_beam_ip"]
-        self.x_dest_beam_port = self.conf["xengines"]["x_dest_beam_port"]
+        self.npipeline = npipeline
+        self.set_properties()
 
     @staticmethod
     def parse_config(config_file):
@@ -77,8 +60,43 @@ class Controller():
             raise RuntimeError('Config file missing "arx" key')
         if 'dr' not in conf:
             raise RuntimeError('Config file missing "dr" key')
+        if 'etcd' not in conf:
+            raise RuntimeError('Config file missing "etcd" key')
 
         return conf
+
+    def set_properties(self):
+        """ Set properties, then recalculate config properties.
+        """
+
+        if self.etcdhost is None:
+            self.etcdhost = self.conf["etcd"]["host"]
+            # TODO: also use port?
+
+        if self.xhosts is None:
+            self.xhosts = self.conf["xengines"]["xhosts"]
+        self.nhosts = len(self.xhosts)
+
+        if self.npipeline is None:
+            self.npipeline = self.conf["xengines"]["nxpipeline"]
+
+        drip_mapping = self.conf["drip_mapping"]
+        drips = [ip for name in self.conf["xengines"]["x_dest_corr_name"] for ip in drip_mapping[name]]
+        self.x_dest_corr_ip = list(sorted(drips*(self.npipeline)))
+        self.x_dest_corr_slow_port = self.conf["xengines"]["x_dest_corr_slow_port"]
+        self.x_dest_corr_fast_port = self.conf["xengines"]["x_dest_corr_fast_port"]
+        # beamforming
+        self.x_dest_beam_ip = self.conf["xengines"]["x_dest_beam_ip"]
+        self.x_dest_beam_port = self.conf["xengines"]["x_dest_beam_port"]
+
+        # one p object controls all products on given subband
+        p = Lwa352CorrelatorControl(self.xhosts, npipeline_per_host=self.npipeline, etcdhost=self.etcdhost)
+        self.pcontroller = p
+        self.pipelines = p.pipelines
+
+        # data recorder control client
+        self.drc = mcs.Client()
+        self.drb = None
 
     def set_arx(self, preset=None):
         """ Set ARX to preset config.
@@ -89,7 +107,7 @@ class Controller():
         if preset is None:
             preset = aconf['preset']
 
-        ma = lwa_arx.ARX() 
+        ma = lwa_arx.ARX()   # TODO: update to use self.etcdhost
         for adr in aconf['adrs']:
             ma.load_cfg(adr, preset)
 
@@ -149,28 +167,29 @@ class Controller():
 
         xconf = self.conf['xengines']
 
-        # one p object controls all products on given subband
-        p = Lwa352CorrelatorControl(self.xhosts, npipeline_per_host=self.npipeline)
-        
-        p.stop_pipelines()   # stop before starting
-        p.start_pipelines() 
-        print(f'pipelines up? {p.pipelines_are_up()}')
-        self.logger.info(f'pipelines up? {p.pipelines_are_up()}')
+        self.pcontroller.stop_pipelines()   # stop before starting
+        self.pcontroller.start_pipelines() 
+        print(f'pipelines up? {self.pcontroller.pipelines_are_up()}')
+        self.logger.info(f'pipelines up? {self.pcontroller.pipelines_are_up()}')
 
-        p.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_port)  # iterates over all slow corr outputs
-        #p.corr_output_part.set_destination(?)   # fast (partial) correlator output?
+        # slow
+        if 'drvs' in self.conf['dr']['recorders']:
+            print("Configuring x-engine for slow visibilities")
+            self.pcontroller.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_slow_port)  # iterates over all slow corr outputs
+        else:
+            print("Not configuring x-engine for slow visibilities")            
 
-        for pipe in p.pipelines:
-            pipe.beamform_output.set_destination(self.x_dest_beam_ip, self.x_dest_beam_port) # 1 power beam
-#            for b in range(2):  # two pols
-#                for i in range(352):
-#                    s0 = 1 if b == 0 and i == 2 else 0
-#                    s1 = 1 if b == 1 and i == 2 else 0
-#                    pipe.beamform.update_calibration_gains(b, 2*i+0, s0*np.ones(96, dtype=np.complex64))
-#                    pipe.beamform.update_calibration_gains(b, 2*i+1, s1*np.ones(96, dtype=np.complex64))
-#                    pipe.beamform.update_delays(b, np.zeros(352*2))
+        if 'drvf' in self.conf['dr']['recorders']:
+            print("Configuring x-engine for fast visibilities")
+            for i in range(self.npipeline*self.nhosts):
+                self.pcontroller.pipelines[i].corr_output_part.set_destination(self.x_dest_corr_ip[i], self.x_dest_corr_fast_port[i%4])
+        else:
+            print("Not configuring x-engine for fast visibilities")            
 
-    def start_xengine_bf(self, num=1, target=None, track=False):
+        if 'dr1' in self.conf['dr']['recorders']:  # TODO: generalize name
+            print('Start power beams with "start_xengine_bf" method"')
+
+    def start_xengine_bf(self, num=1, target=None, track=True):
         """ Starts the xengine for beamformer observation.
         num refers to the beamformer number (1 through 4).
         target can be:
@@ -178,74 +197,96 @@ class Controller():
          - tuple of (ra, dec) in (hourangle, degrees).
         """
 
-        import glob
-
         if isinstance(target, tuple):
             ra, dec = target
         elif isinstance(target, str):
             ra = target
             dec = None
-
-        c = BeamPointingControl(num)
-        calfiles = glob.glob(self.xhosts['calfiles'])
-        for calfile in calfiles: 
-            try: 
-                c.set_beam_calibration(calfile) 
-            except Exception as e: 
-                print(f"ERROR: {e}")
-
-        # one-time commands to point
-        c.set_beam_dest()
-        if target is None:
-            c.set_beam_pointing(0, 90)
         else:
-            c.set_beam_target(ra, dec=dec)
+            print("No target specified. Pointing at zenith.")
+            ra = 0
+            dec = 90
+
+        cal_directory = self.conf['xengines']['cal_directory']
+        self.drb = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
+                                                                   npipeline_per_server=self.npipeline,
+                                                                   cal_directory=cal_directory, etcdhost=self.etcdhost)
+        if target is None:
+            self.drb.set_beam_pointing(0, 90)
+        else:
+            self.drb.set_beam_target(ra, dec=dec)
+
+        # overload dest set by default
+        if self.conf['xengines']['x_dest_beam_port'] is not None:
+            addr = self.conf['xengines']['x_dest_beam_ip']
+            port = self.conf['xengines']['x_dest_beam_port']
+            self.drb.set_beam_dest(addr=addr[num-1], port=port[num-1])  # TODO: test this on cal-im
 
         # track
         if track and target is not None:
-            t = BeamTracker(c, update_interval=self.xhosts['update_interval'])
+            t = xengine_beamformer_control.BeamTracker(self.drb, update_interval=self.conf['xengines']['update_interval'])
             t.track(target)
         elif track and target is None:
             print("Must input target to track.")
+
+    def status_xengine(self):
+        """ to be implemented for more detailed monitor point info
+        """
+        print("Pipeline id, status:")
+        for pipeline in self.pipelines:
+            print(pipeline.pipeline_id, pipeline.check_connection())
 
     def stop_xengine(self):
         """ Stop xengines listed in configuration file.
         """
 
-        p = Lwa352CorrelatorControl(self.xhosts, npipeline_per_host=self.npipeline)
-        p.stop_pipelines()
+        self.pcontroller.stop_pipelines()
 
     def start_dr(self, recorders=None, duration=None):
         """ Start data recorders listed recorders.
         Defaults to starting those listed in configuration file.
-        duration is power beam recording in seconds.
+        duration is power beam recording in milliseconds.
         """
 
-        # uses ezdr auto-discovery 'slow', 'fast', 'power', 'voltage'
         dconf = self.conf['dr']
         if recorders is None:
             recorders = dconf['recorders']
 
         # start ms writing
-        badresults = []
+        print(f"Starting recorders: {recorders}")
         for recorder in recorders:
-            lwa_drc = ezdr.Lwa352RecorderControl(recorder)
-            lwa_drc.print_status()   # TODO: send to self.logger
-            if recorder == 'power':
-                if duration is not None:
-                    d.record(duration=duration)
-                else:
-                    print("power beam needs duration")
-            elif recorder == 'slow':
-                results = lwa_drc.start()
-                for result in results:
-                    if result[1]['status'] != 'success':
-                        badresults.append(result[1]['response'])
+            # power beams
+            if self.drb is None:
+                print("Must run start_xengine_bf before running beamforming data recorders")
+            else:
+                if recorder in [f'dr{n}' for n in range(1,11)]:
+                    if duration is not None:
+                        self.drc.send_command(recorder, 'record', start_mjd='now', start_mpm='now', duration_ms=duration)
+                    else:
+                        print("power beam needs duration")
+            # visibilities
+            if recorder in ['drvs', 'drvf']:
+                self.drc.send_command(recorder, 'start', start_mjd='now', start_mpm='now')
 
-        if len(badresults):
-            print("Data recorder not started successfully. Responses:")
-            print(badresults)
-            
+            if self.drc.read_monitor_point('summary', recorder) != 'success':
+                self.drc.read_monitor_point('info', recorder)
+
+    def status_dr(self, recorders=None):
+        """ Print data recorder info monitor point
+        """
+
+        dconf = self.conf['dr']
+        if recorders is None:
+            recorders = dconf['recorders']
+
+        # start ms writing
+        statuses = []
+        for recorder in recorders:
+            statuses.append(self.drc.read_monitor_point('op-type', recorder).value)
+            if self.drc.read_monitor_point('summary', recorder) != 'success':
+                statuses.append(f"WARNING: {recorder} not fully recording: {self.drc.read_monitor_point('info', recorder).value}")
+
+        return statuses
 
     def stop_dr(self, recorders=None):
         """ Stop data recorders in list recorders.
@@ -257,6 +298,6 @@ class Controller():
             recorders = dconf['recorders']
 
         for recorder in recorders:
-            lwa_drc = ezdr.Lwa352RecorderControl(recorder)
-            lwa_drc.stop()
+            if recorder in ['drvs', 'drvf']:
+                self.drc.send_command(recorder, 'stop', stop_mjd='now', stop_mpm='now')                
           

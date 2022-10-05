@@ -1,1 +1,1 @@
-__all__ = ['mcs', 'ezdr', 'common', 'control', 'xengine_beamformer_control']
+__all__ = ['mcs', 'common', 'control', 'xengine_beamformer_control']
