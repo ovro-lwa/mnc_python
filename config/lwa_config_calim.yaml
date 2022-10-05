@@ -1,12 +1,16 @@
+# configuration of etcd server for monitor and control
+
 etcd:
-#    host: "etcdv3service"  # standard
-    host: "lxdlwacr"  # temp
+#    host: "etcdv3service"  # standard service location
+    host: "lxdlwacr"  # temporary service location
     port: "2379"
 
+# configuration of ARX
 arx:
     adrs: [11, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45]
-    preset: 1
+    preset: 1  # preset of 0, 1, 2 are supported. each intended for specific scenarios
 
+# configuration of F-engines running on SNAP2s
 fengines:
     snap2s_inuse: ["snap02", "snap03", "snap04", "snap05", "snap06", "snap07", "snap08", "snap09", "snap10", "snap11"]
     chans_per_packet: 96
@@ -55,6 +59,7 @@ fengines:
         gbe: "10.41.0.111"
         source_port: 10000
 
+# configuration of x-engines (correlator beamformers) running on GPUs
 xengines:
   xhosts: ["lxdlwagpu01", "lxdlwagpu02", "lxdlwagpu03", "lxdlwagpu04", "lxdlwagpu05", "lxdlwagpu06", "lxdlwagpu07", "lxdlwagpu08"]
   nxpipeline: 4
@@ -124,14 +129,15 @@ xengines:
     10.41.0.24-20000: [3424, 3520]
     10.41.0.40-10000: [3520, 3616]
     10.41.0.40-20000: [3616, 3712]
-  x_dest_corr_name: ["lwacalim01", "lwacalim02", "lwacalim03", "lwacalim04", "lwacalim05", "lwacalim06", "lwacalim07", "lwacalim08"]
+  x_dest_corr_name: ["lwacalim01", "lwacalim02", "lwacalim03", "lwacalim04", "lwacalim05", "lwacalim06", "lwacalim07", "lwacalim08"]  # where gpu servers send data (usually maps one-to-one from gpu to calim node)
   x_dest_corr_slow_port: [10001, 10001, 10002, 10002]
   x_dest_corr_fast_port: [11001, 11001, 11002, 11002]
   x_dest_beam_ip: None
   x_dest_beam_port: None
-  cal_directory: "/home/pipeline/caltables/latest/"
+  cal_directory: "/home/pipeline/caltables/latest/"   # location on destination server of calibration tables
   update_interval: 15  # beamformer tracking update cadence in seconds
 
+# IP address of each data recorder server (used by x-eng control)
 drip_mapping:
   lwacalim01: ["10.41.0.76"]
   lwacalim02: ["10.41.0.77"]
@@ -142,6 +148,6 @@ drip_mapping:
   lwacalim07: ["10.41.0.82"]
   lwacalim08: ["10.41.0.83"]
 
+# Data recorder configuration
 dr:
-  recorders: ["drvs"] # drvs, drvf, dr1 (power beam)
-
+  recorders: ["drvs"]  # Supported modes "drvs" (slow vis), "drvf" (fast vis), "dr1" (power beam)

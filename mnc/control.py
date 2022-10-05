@@ -265,7 +265,7 @@ class Controller():
                     else:
                         print("power beam needs duration")
             # visibilities
-            elif recorder in ['drvs', 'drvf']:
+            if recorder in ['drvs', 'drvf']:
                 self.drc.send_command(recorder, 'start', start_mjd='now', start_mpm='now')
 
             if self.drc.read_monitor_point('summary', recorder) != 'success':
