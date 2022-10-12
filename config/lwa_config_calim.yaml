@@ -1,8 +1,8 @@
 # configuration of etcd server for monitor and control
 
 etcd:
-#    host: "etcdv3service"  # standard service location
-    host: "lxdlwacr"  # temporary service location
+    host: "etcdv3service"  # standard service location
+    #host: "lxdlwacr"  # temporary service location
     port: "2379"
 
 # configuration of ARX
@@ -150,4 +150,4 @@ drip_mapping:
 
 # Data recorder configuration
 dr:
-  recorders: ["drvs"]  # Supported modes "drvs" (slow vis), "drvf" (fast vis), "dr1" (power beam)
+  recorders: ["dr1"]  # Supported modes "drvs" (slow vis), "drvf" (fast vis), "dr1" (power beam)

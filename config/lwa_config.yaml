@@ -1,6 +1,6 @@
 etcd:
-#    host: "etcdv3service"  # standard
-    host: "lxdlwacr"  # temp
+    host: "etcdv3service"  # standard
+    #host: "lxdlwacr"  # temp
     port: "2379"
 
 arx:

@@ -189,7 +189,7 @@ class Controller():
         if 'dr1' in self.conf['dr']['recorders']:  # TODO: generalize name
             print('Start power beams with "start_xengine_bf" method"')
 
-    def start_xengine_bf(self, num=1, target=None, track=True):
+    def start_xengine_bf(self, num=1, target=None, track=True, calibrate=True):
         """ Starts the xengine for beamformer observation.
         num refers to the beamformer number (1 through 4).
         target can be:
@@ -203,11 +203,14 @@ class Controller():
             ra = target
             dec = None
         else:
-            print("No target specified. Pointing at zenith.")
+            print("No target specified. Pointing at NCP.")
             ra = 0
             dec = 90
 
-        cal_directory = self.conf['xengines']['cal_directory']
+        if calibrate:
+            cal_directory = self.conf['xengines']['cal_directory']
+        else:
+            cal_directory = '/pathshouldnotexist'
         self.drb = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
                                                                    npipeline_per_server=self.npipeline,
                                                                    cal_directory=cal_directory, etcdhost=self.etcdhost)
@@ -223,11 +226,9 @@ class Controller():
             self.drb.set_beam_dest(addr=addr[num-1], port=port[num-1])  # TODO: test this on cal-im
 
         # track
-        if track and target is not None:
+        if track:
             t = xengine_beamformer_control.BeamTracker(self.drb, update_interval=self.conf['xengines']['update_interval'])
             t.track(target)
-        elif track and target is None:
-            print("Must input target to track.")
 
     def status_xengine(self):
         """ to be implemented for more detailed monitor point info
