@@ -91,6 +91,7 @@ class Controller():
 
         # one p object controls all products on given subband
         p = Lwa352CorrelatorControl(self.xhosts, npipeline_per_host=self.npipeline, etcdhost=self.etcdhost)
+        p.log.setLevel(logging.INFO)
         self.pcontroller = p
         self.pipelines = p.pipelines
 
