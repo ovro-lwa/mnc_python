@@ -279,7 +279,7 @@ class Controller():
                         print("power beam needs duration")
             # visibilities
             if recorder in ['drvs', 'drvf']:
-                self.drc.send_command(recorder, 'start', start_mjd='now', start_mpm='now')
+                self.drc.send_command(recorder, 'start', mjd='now', mpm='now')
 
             if self.drc.read_monitor_point('summary', recorder).value != 'normal':
                 self.drc.read_monitor_point('info', recorder)
@@ -312,5 +312,5 @@ class Controller():
 
         for recorder in recorders:
             if recorder in ['drvs', 'drvf']:
-                self.drc.send_command(recorder, 'stop', stop_mjd='now', stop_mpm='now')                
+                self.drc.send_command(recorder, 'stop', mjd='now', mpm='now')                
           
