@@ -281,7 +281,7 @@ class Controller():
             if recorder in ['drvs', 'drvf']:
                 self.drc.send_command(recorder, 'start', start_mjd='now', start_mpm='now')
 
-            if self.drc.read_monitor_point('summary', recorder) != 'success':
+            if self.drc.read_monitor_point('summary', recorder).value != 'normal':
                 self.drc.read_monitor_point('info', recorder)
 
     def status_dr(self, recorders=None):
@@ -296,7 +296,7 @@ class Controller():
         statuses = []
         for recorder in recorders:
             statuses.append(self.drc.read_monitor_point('op-type', recorder).value)
-            if self.drc.read_monitor_point('summary', recorder) != 'success':
+            if self.drc.read_monitor_point('summary', recorder).value != 'normal':
                 statuses.append(f"WARNING: {recorder} not fully recording: {self.drc.read_monitor_point('info', recorder).value}")
 
         return statuses
