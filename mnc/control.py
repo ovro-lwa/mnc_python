@@ -193,20 +193,31 @@ class Controller():
     def start_xengine_bf(self, num=1, target=None, track=True, calibrate=True):
         """ Starts the xengine for beamformer observation.
         num refers to the beamformer number (1 through 4).
+        If track=True, target is treated as celestial coords or by target name
+        If track=False, target is treated as (az, el)
         target can be:
          - source name ('zenith', 'sun') or
          - tuple of (ra, dec) in (hourangle, degrees).
+         - tuple of (az, el) in degrees, if track=False
         """
 
-        if isinstance(target, tuple):
-            ra, dec = target
-        elif isinstance(target, str):
-            ra = target
-            dec = None
+        if track:
+            if isinstance(target, tuple):
+                ra, dec = target
+            elif isinstance(target, str):
+                ra = target
+                dec = None
+            else:
+                print("No tracking target specified. Pointing at NCP.")
+                ra = 0
+                dec = 90
         else:
-            print("No target specified. Pointing at NCP.")
-            ra = 0
-            dec = 90
+            if isinstance(target, tuple):
+                az, el = target
+            else:
+                print("No untracked target specified. Pointing at zenith.")
+                az = 0
+                el = 90
 
         if calibrate:
             cal_directory = self.conf['xengines']['cal_directory']
@@ -215,8 +226,8 @@ class Controller():
         self.drb = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
                                                                    npipeline_per_server=self.npipeline,
                                                                    cal_directory=cal_directory, etcdhost=self.etcdhost)
-        if target is None:
-            self.drb.set_beam_pointing(0, 90)
+        if track:
+            self.drb.set_beam_pointing(az, el)
         else:
             self.drb.set_beam_target(ra, dec=dec)
 
