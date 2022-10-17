@@ -24,7 +24,7 @@ from lwa_antpos.station import ovro
 from mnc.mcs import Client as MCSClient
 from mnc.common import LWATime, NCHAN as NCHAN_NATIVE, CLOCK as CLOCK_NATIVE
 try:
-    from xengine_beamformer_control import BeamPointingControl
+    from mnc.xengine_beamformer_control import BeamPointingControl
 except ImportError as e:
     BeamPointingControl = BeamTracker = None
     logger.warn(f"Cannot import BeamPointingControl, will not send beamformer commands")
