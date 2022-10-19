@@ -463,13 +463,17 @@ def main(args):
         
     ## Iterate through the observations
     last_freq1 = 0
+    last_filter1 = -1
     last_gain1 = -1
     last_freq2 = 0
+    last_filter2 = -1
     last_gain2 = -1
     for i,o in enumerate(obs):
         if obs[0]['beam'] == 1 and obs[0]['time_avg'] == 0:
-            if o['freq1'] != last_freq1 or o['gain1'] != last_gain1:
-                logger.info(f"Moving tuning 1 to {(o['freq1']/1e6):.3f} MHz at gain {o['gain1']}")
+            if o['freq1'] != last_freq1 \
+               or o['filter'] != last_filter1 \
+               or o['gain1'] != last_gain1:
+                logger.info(f"Moving tuning 1 to {(o['freq1']/1e6):.3f} MHz, filter {o['filter']} at gain {o['gain1']}")
                 if dr is not None and not args.dry_run:
                     dr.send_command(f"drt{obs[0]['beam']}", 'drx',
                                     beam=obs[0]['beam'],
@@ -478,9 +482,12 @@ def main(args):
                                     filter=o['filter'],
                                     gain=o['gain1'])
                 last_freq1 = o['freq1']
+                last_filter1 = o['filter']
                 last_gain1 = o['gain1']
-            if o['freq2'] != last_freq2 or o['gain2'] != last_gain2:
-                logger.info(f"Moving tuning 2 to {(o['freq2']/1e6):.3f} MHz at gain {o['gain2']}")
+            if o['freq2'] != last_freq2 \
+               or o['filter'] != last_filter2 \
+               or o['gain2'] != last_gain2:
+                logger.info(f"Moving tuning 2 to {(o['freq2']/1e6):.3f} MHz, filter {o['filter']} at gain {o['gain2']}")
                 if dr is not None and not args.dry_run:
                     dr.send_command(f"drt{obs[0]['beam']}", 'drx',
                                     beam=obs[0]['beam'],
@@ -489,6 +496,7 @@ def main(args):
                                     filter=o['filter'],
                                     gain=o['gain2'])
                 last_freq2 = o['freq2']
+                last_filter2 = o['filter']
                 last_gain2 = o['gain2']
                 
         name = o['ra']
