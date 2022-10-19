@@ -450,8 +450,9 @@ def main(args):
             except OSError:
                 pass
             with open("%s_%04i_metadata.txt" % (obs_pid, obs_sid), 'w') as fh:
-                fh.write("  1 [%s] ['%s']  0 [UNK]\n" % (os.path.basename(status[1]['response']['filename']),
-                                                         os.path.dirname(status[1]['response']['filename'])))
+                if status[1]['status'] == 'success':
+                    fh.write("  1 [%s] ['%s']  0 [UNK]\n" % (os.path.basename(status[1]['response']['filename']),
+                                                             os.path.dirname(status[1]['response']['filename'])))
         else:
             logger.error("Record command failed: %s", str(status[1]))
             
