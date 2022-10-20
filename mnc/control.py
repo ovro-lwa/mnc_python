@@ -320,5 +320,11 @@ class Controller():
 
         for recorder in recorders:
             if recorder in ['drvs', 'drvf']:
-                self.drc.send_command(recorder, 'stop', mjd='now', mpm='now')                
-          
+                accepted, response = self.drc.send_command(recorder, 'stop', mjd='now', mpm='now')
+
+                if not accepted:
+                    print(f"WARNING: no response from {recorder}")
+                elif response['status'] == 'success':
+                    print(f"recording on {recorder} stopped")
+                else:
+                    print(f"WARNING: stopping recording on {recorder} failed: {response['response']}")
