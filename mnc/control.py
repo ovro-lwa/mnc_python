@@ -97,7 +97,7 @@ class Controller():
 
         # data recorder control client
         self.drc = mcs.Client()
-        self.drb = None
+        self.drb = {}
 
     def set_arx(self, preset=None):
         """ Set ARX to preset config.
@@ -219,27 +219,28 @@ class Controller():
                 az = 0
                 el = 90
 
-        if calibrate:
-            cal_directory = self.conf['xengines']['cal_directory']
-        else:
-            cal_directory = '/pathshouldnotexist'
-        self.drb = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
-                                                                   npipeline_per_server=self.npipeline,
-                                                                   cal_directory=cal_directory, etcdhost=self.etcdhost)
+        if num not in self.drb:
+            if calibrate:
+                cal_directory = self.conf['xengines']['cal_directory']
+            else:
+                cal_directory = '/pathshouldnotexist'
+            self.drb[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
+                                                                            npipeline_per_server=self.npipeline,
+                                                                            cal_directory=cal_directory, etcdhost=self.etcdhost)
         if track:
-            self.drb.set_beam_target(ra, dec=dec)
+            self.drb[num].set_beam_target(ra, dec=dec)
         else:
-            self.drb.set_beam_pointing(az, el)
+            self.drb[num].set_beam_pointing(az, el)
 
         # overload dest set by default
         if self.conf['xengines']['x_dest_beam_port'] is not None:
             addr = self.conf['xengines']['x_dest_beam_ip']
             port = self.conf['xengines']['x_dest_beam_port']
-            self.drb.set_beam_dest(addr=addr[num-1], port=port[num-1])  # TODO: test this on cal-im
+            self.drb[num].set_beam_dest(addr=addr[num-1], port=port[num-1])  # TODO: test this on cal-im
 
         # track
         if track:
-            t = xengine_beamformer_control.BeamTracker(self.drb, update_interval=self.conf['xengines']['update_interval'])
+            t = xengine_beamformer_control.BeamTracker(self.drb[num], update_interval=self.conf['xengines']['update_interval'])
             t.track(target)
 
     def status_xengine(self):
