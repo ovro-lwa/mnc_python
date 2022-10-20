@@ -166,6 +166,9 @@ class Controller():
         """ Start xengines listed in configuration file.
         """
 
+        # Clear the beamformer state
+        self.drb.clear()
+        
         xconf = self.conf['xengines']
 
         self.pcontroller.stop_pipelines()   # stop before starting
