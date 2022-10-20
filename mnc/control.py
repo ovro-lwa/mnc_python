@@ -227,9 +227,9 @@ class Controller():
                                                                    npipeline_per_server=self.npipeline,
                                                                    cal_directory=cal_directory, etcdhost=self.etcdhost)
         if track:
-            self.drb.set_beam_pointing(az, el)
-        else:
             self.drb.set_beam_target(ra, dec=dec)
+        else:
+            self.drb.set_beam_pointing(az, el)
 
         # overload dest set by default
         if self.conf['xengines']['x_dest_beam_port'] is not None:
