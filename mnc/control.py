@@ -274,13 +274,20 @@ class Controller():
             else:
                 if recorder in [f'dr{n}' for n in range(1,11)]:
                     if duration is not None:
-                        self.drc.send_command(recorder, 'record', start_mjd='now', start_mpm='now', duration_ms=duration)
+                        accepted, response = self.drc.send_command(recorder, 'record', start_mjd='now', start_mpm='now', duration_ms=duration)
                     else:
                         print("power beam needs duration")
             # visibilities
             if recorder in ['drvs', 'drvf']:
-                self.drc.send_command(recorder, 'start', mjd='now', mpm='now')
+                accepted, response = self.drc.send_command(recorder, 'start', mjd='now', mpm='now')
 
+            if not accepted:
+                print(f"WARNING: no response from {recorder}")
+            elif response['status'] == 'success':
+                print(f"recording on {recorder} to '{response['response']['filename']}'")
+            else:
+                print(f"WARNING: recording on {recorder} failed: {response['response']}")
+                
             if self.drc.read_monitor_point('summary', recorder).value != 'normal':
                 self.drc.read_monitor_point('info', recorder)
 
@@ -297,7 +304,7 @@ class Controller():
         for recorder in recorders:
             statuses.append(self.drc.read_monitor_point('op-type', recorder).value)
             if self.drc.read_monitor_point('summary', recorder).value != 'normal':
-                statuses.append(f"WARNING: {recorder} not fully recording: {self.drc.read_monitor_point('info', recorder).value}")
+                statuses.append(f"WARNING: {recorder} not fully operational: {self.drc.read_monitor_point('info', recorder).value}")
 
         return statuses
 
