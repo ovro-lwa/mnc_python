@@ -97,7 +97,7 @@ class Controller():
 
         # data recorder control client
         self.drc = mcs.Client()
-        self.drb = None
+        self.drb = {}
 
     def set_arx(self, preset=None):
         """ Set ARX to preset config.
@@ -166,6 +166,9 @@ class Controller():
         """ Start xengines listed in configuration file.
         """
 
+        # Clear the beamformer state
+        self.drb.clear()
+        
         xconf = self.conf['xengines']
 
         self.pcontroller.stop_pipelines()   # stop before starting
@@ -219,27 +222,28 @@ class Controller():
                 az = 0
                 el = 90
 
-        if calibrate:
-            cal_directory = self.conf['xengines']['cal_directory']
-        else:
-            cal_directory = '/pathshouldnotexist'
-        self.drb = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
-                                                                   npipeline_per_server=self.npipeline,
-                                                                   cal_directory=cal_directory, etcdhost=self.etcdhost)
+        if num not in self.drb:
+            if calibrate:
+                cal_directory = self.conf['xengines']['cal_directory']
+            else:
+                cal_directory = '/pathshouldnotexist'
+            self.drb[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
+                                                                            npipeline_per_server=self.npipeline,
+                                                                            cal_directory=cal_directory, etcdhost=self.etcdhost)
         if track:
-            self.drb.set_beam_pointing(az, el)
+            self.drb[num].set_beam_target(ra, dec=dec)
         else:
-            self.drb.set_beam_target(ra, dec=dec)
+            self.drb[num].set_beam_pointing(az, el)
 
         # overload dest set by default
         if self.conf['xengines']['x_dest_beam_port'] is not None:
             addr = self.conf['xengines']['x_dest_beam_ip']
             port = self.conf['xengines']['x_dest_beam_port']
-            self.drb.set_beam_dest(addr=addr[num-1], port=port[num-1])  # TODO: test this on cal-im
+            self.drb[num].set_beam_dest(addr=addr[num-1], port=port[num-1])  # TODO: test this on cal-im
 
         # track
         if track:
-            t = xengine_beamformer_control.BeamTracker(self.drb, update_interval=self.conf['xengines']['update_interval'])
+            t = xengine_beamformer_control.BeamTracker(self.drb[num], update_interval=self.conf['xengines']['update_interval'])
             t.track(target)
 
     def status_xengine(self):
@@ -274,13 +278,20 @@ class Controller():
             else:
                 if recorder in [f'dr{n}' for n in range(1,11)]:
                     if duration is not None:
-                        self.drc.send_command(recorder, 'record', start_mjd='now', start_mpm='now', duration_ms=duration)
+                        accepted, response = self.drc.send_command(recorder, 'record', start_mjd='now', start_mpm='now', duration_ms=duration)
                     else:
                         print("power beam needs duration")
             # visibilities
             if recorder in ['drvs', 'drvf']:
-                self.drc.send_command(recorder, 'start', mjd='now', mpm='now')
+                accepted, response = self.drc.send_command(recorder, 'start', mjd='now', mpm='now')
 
+            if not accepted:
+                print(f"WARNING: no response from {recorder}")
+            elif response['status'] == 'success':
+                print(f"recording on {recorder} to '{response['response']['filename']}'")
+            else:
+                print(f"WARNING: recording on {recorder} failed: {response['response']}")
+                
             if self.drc.read_monitor_point('summary', recorder).value != 'normal':
                 self.drc.read_monitor_point('info', recorder)
 
@@ -297,7 +308,7 @@ class Controller():
         for recorder in recorders:
             statuses.append(self.drc.read_monitor_point('op-type', recorder).value)
             if self.drc.read_monitor_point('summary', recorder).value != 'normal':
-                statuses.append(f"WARNING: {recorder} not fully recording: {self.drc.read_monitor_point('info', recorder).value}")
+                statuses.append(f"WARNING: {recorder} not fully operational: {self.drc.read_monitor_point('info', recorder).value}")
 
         return statuses
 
@@ -312,5 +323,11 @@ class Controller():
 
         for recorder in recorders:
             if recorder in ['drvs', 'drvf']:
-                self.drc.send_command(recorder, 'stop', mjd='now', mpm='now')                
-          
+                accepted, response = self.drc.send_command(recorder, 'stop', mjd='now', mpm='now')
+
+                if not accepted:
+                    print(f"WARNING: no response from {recorder}")
+                elif response['status'] == 'success':
+                    print(f"recording on {recorder} stopped")
+                else:
+                    print(f"WARNING: stopping recording on {recorder} failed: {response['response']}")
