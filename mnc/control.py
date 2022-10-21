@@ -162,7 +162,7 @@ class Controller():
                 
                 f.print_status_all()
 
-    def start_xengine(self, recorders=None)
+    def start_xengine(self, recorders=None):
         """ Start xengines listed in configuration file.
         Recorders is list of recorders to configure output to. Defaults to those in config file.
         Supported modes "drvs" (slow vis), "drvf" (fast vis), "dr1" (power beam)
@@ -293,7 +293,7 @@ class Controller():
             if not accepted:
                 print(f"WARNING: no response from {recorder}")
             elif response['status'] == 'success':
-                print(f"recording on {recorder} to '{response['response']['filename']}'")
+                print(f"recording on {recorder}")
             else:
                 print(f"WARNING: recording on {recorder} failed: {response['response']}")
                 
