@@ -162,9 +162,14 @@ class Controller():
                 
                 f.print_status_all()
 
-    def start_xengine(self):
+    def start_xengine(self, recorders=None)
         """ Start xengines listed in configuration file.
+        Recorders is list of recorders to configure output to. Defaults to those in config file.
+        Supported modes "drvs" (slow vis), "drvf" (fast vis), "dr1" (power beam)
         """
+
+        if recorders is None:
+            recorders = self.conf['dr']['recorders']
 
         # Clear the beamformer state
         self.drb.clear()
@@ -177,20 +182,20 @@ class Controller():
         self.logger.info(f'pipelines up? {self.pcontroller.pipelines_are_up()}')
 
         # slow
-        if 'drvs' in self.conf['dr']['recorders']:
+        if 'drvs' in recorders:
             print("Configuring x-engine for slow visibilities")
             self.pcontroller.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_slow_port)  # iterates over all slow corr outputs
         else:
             print("Not configuring x-engine for slow visibilities")            
 
-        if 'drvf' in self.conf['dr']['recorders']:
+        if 'drvf' in recorders:
             print("Configuring x-engine for fast visibilities")
             for i in range(self.npipeline*self.nhosts):
                 self.pcontroller.pipelines[i].corr_output_part.set_destination(self.x_dest_corr_ip[i], self.x_dest_corr_fast_port[i%4])
         else:
             print("Not configuring x-engine for fast visibilities")            
 
-        if 'dr1' in self.conf['dr']['recorders']:  # TODO: generalize name
+        if 'dr1' in recorders:
             print('Start power beams with "start_xengine_bf" method"')
 
     def start_xengine_bf(self, num=1, target=None, track=True, calibrate=True):
