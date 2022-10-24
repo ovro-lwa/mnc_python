@@ -293,7 +293,12 @@ class Controller():
             if not accepted:
                 print(f"WARNING: no response from {recorder}")
             elif response['status'] == 'success':
-                print(f"recording on {recorder}")
+                rec_extra_info = ''
+                try:
+                    rec_extra_info = f" to file {response['response']['filename']}"
+                except KeyError:
+                    pass
+                print(f"recording on {recorder}{rec_extra_info}")
             else:
                 print(f"WARNING: recording on {recorder} failed: {response['response']}")
                 
