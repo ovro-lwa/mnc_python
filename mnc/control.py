@@ -45,6 +45,19 @@ class Controller():
         self.npipeline = npipeline
         self.set_properties()
 
+        # report
+        modes = []
+        if 'drvs' in self.conf['dr']['recorders']:
+            modes.append('slow')
+        if 'drvf' in self.conf['dr']['recorders']:
+            modes.append('fast')
+        for b in range(1, 11):
+            if f"dr{b}" in self.conf['dr']['recorders']:
+                modes.append(f"beam{b}")
+        print(f"Loaded configuration for {self.nhosts} x-engine host(s) running {self.npipeline} pipeline(s) each")
+        print(f"Supported modes are: {','.join(modes)}")
+        print(f"etcd server being used is: {self.etcdhost}")
+
     @staticmethod
     def parse_config(config_file):
         """ Parse yaml format config_file and return dict
