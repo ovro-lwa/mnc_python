@@ -132,8 +132,8 @@ xengines:
   x_dest_corr_name: ["lwacalim01", "lwacalim02", "lwacalim03", "lwacalim04", "lwacalim05", "lwacalim06", "lwacalim07", "lwacalim08"]  # where gpu servers send data (usually maps one-to-one from gpu to calim node)
   x_dest_corr_slow_port: [10001, 10001, 10002, 10002]
   x_dest_corr_fast_port: [11001, 11001, 11002, 11002]
-  x_dest_beam_ip: None
-  x_dest_beam_port: None
+  x_dest_beam_ip: ["10.41.0.76", "10.41.0.76", "10.41.0.77", "10.41.0.77", "10.41.0.78", "10.41.0.78", "10.41.0.79", "10.41.0.79"]
+  x_dest_beam_port: [20001, 20002, 20001, 20002, 20001, 20002, 20001, 20002]
   cal_directory: "/home/pipeline/caltables/latest/"   # location on destination server of calibration tables
   update_interval: 15  # beamformer tracking update cadence in seconds
 
@@ -150,4 +150,4 @@ drip_mapping:
 
 # Data recorder configuration
 dr:
-  recorders: ['drvs']  # Supported modes "drvs" (slow vis), "drvf" (fast vis), "dr1" (power beam)
+  recorders: ['drvs', 'dr1', 'dr2', 'dr3', 'dr4', 'dr5', 'dr6', 'dr7', 'dr8']  # Supported modes "drvs" (slow vis), "drvf" (fast vis), "dr1" (power beam)
