@@ -262,7 +262,7 @@ class Controller():
         # track
         if track:
             t = xengine_beamformer_control.BeamTracker(self.drb[num], update_interval=self.conf['xengines']['update_interval'])
-            t.track(target)
+            t.track(ra, dec=dec)
 
     def status_xengine(self):
         """ to be implemented for more detailed monitor point info
@@ -286,19 +286,27 @@ class Controller():
         dconf = self.conf['dr']
         if recorders is None:
             recorders = dconf['recorders']
+        elif not isinstance(recoders, (list, tuple)):
+            recorders = [recorders,]
 
         # start ms writing
         print(f"Starting recorders: {recorders}")
         for recorder in recorders:
+            accepted = False
+
             # power beams
-            if self.drb is None:
-                print("Must run start_xengine_bf before running beamforming data recorders")
-            else:
+            try:
+                num = int(recorder[2:], 10)
+                if num not in self.drb:
+                    print(f"Must run start_xengine_bf with 'num={num}' before running beamforming data recorders")
+                    continue
                 if recorder in [f'dr{n}' for n in range(1,11)]:
                     if duration is not None:
                         accepted, response = self.drc.send_command(recorder, 'record', start_mjd='now', start_mpm='now', duration_ms=duration)
                     else:
                         print("power beam needs duration")
+            except ValueError:
+                pass
             # visibilities
             if recorder in ['drvs', 'drvf']:
                 accepted, response = self.drc.send_command(recorder, 'start', mjd='now', mpm='now')
@@ -325,6 +333,8 @@ class Controller():
         dconf = self.conf['dr']
         if recorders is None:
             recorders = dconf['recorders']
+        elif not isinstance(recoders, (list, tuple)):
+            recorders = [recorders,]
 
         # start ms writing
         statuses = []
@@ -343,6 +353,8 @@ class Controller():
         dconf = self.conf['dr']
         if not recorders:
             recorders = dconf['recorders']
+        elif not isinstance(recoders, (list, tuple)):
+            recorders = [recorders,]
 
         for recorder in recorders:
             if recorder in ['drvs', 'drvf']:
