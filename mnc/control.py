@@ -110,7 +110,7 @@ class Controller():
 
         # data recorder control client
         self.drc = mcs.Client()
-        self.drb = {}
+        self.bfc = {}
 
     def set_arx(self, preset=None):
         """ Set ARX to preset config.
@@ -185,7 +185,7 @@ class Controller():
             recorders = self.conf['dr']['recorders']
 
         # Clear the beamformer state
-        self.drb.clear()
+        self.bfc.clear()
         
         xconf = self.conf['xengines']
 
@@ -240,29 +240,29 @@ class Controller():
                 az = 0
                 el = 90
 
-        if num not in self.drb:
+        if num not in self.bfc:
             if calibrate:
                 cal_directory = self.conf['xengines']['cal_directory']
             else:
                 cal_directory = '/pathshouldnotexist'
-            self.drb[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
+            self.bfc[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
                                                                             npipeline_per_server=self.npipeline,
                                                                             cal_directory=cal_directory, etcdhost=self.etcdhost)
         if track:
-            self.drb[num].set_beam_target(ra, dec=dec)
+            self.bfc[num].set_beam_target(ra, dec=dec)
         else:
-            self.drb[num].set_beam_pointing(az, el)
+            self.bfc[num].set_beam_pointing(az, el)
 
         # overload dest set by default
         if self.conf['xengines']['x_dest_beam_port'] is not None:
             addr = self.conf['xengines']['x_dest_beam_ip']
             port = self.conf['xengines']['x_dest_beam_port']
-            self.drb[num].set_beam_dest(addr=addr[num-1], port=port[num-1])  # TODO: test this on cal-im
+            self.bfc[num].set_beam_dest(addr=addr[num-1], port=port[num-1])  # TODO: test this on cal-im
 
         # track
         if track:
-            t = xengine_beamformer_control.BeamTracker(self.drb[num], update_interval=self.conf['xengines']['update_interval'])
-            t.track(target)
+            t = xengine_beamformer_control.BeamTracker(self.bfc[num], update_interval=self.conf['xengines']['update_interval'])
+            t.track(ra, dec=dec)
 
     def status_xengine(self):
         """ to be implemented for more detailed monitor point info
@@ -286,19 +286,27 @@ class Controller():
         dconf = self.conf['dr']
         if recorders is None:
             recorders = dconf['recorders']
+        elif not isinstance(recorders, (list, tuple)):
+            recorders = [recorders,]
 
         # start ms writing
         print(f"Starting recorders: {recorders}")
         for recorder in recorders:
+            accepted = False
+
             # power beams
-            if self.drb is None:
-                print("Must run start_xengine_bf before running beamforming data recorders")
-            else:
+            try:
+                num = int(recorder[2:], 10)
+                if num not in self.bfc:
+                    print(f"Must run start_xengine_bf with 'num={num}' before running beamforming data recorders")
+                    continue
                 if recorder in [f'dr{n}' for n in range(1,11)]:
                     if duration is not None:
                         accepted, response = self.drc.send_command(recorder, 'record', start_mjd='now', start_mpm='now', duration_ms=duration)
                     else:
-                        print("power beam needs duration")
+                        print("Power beam recordings require a duration")
+            except ValueError:
+                pass
             # visibilities
             if recorder in ['drvs', 'drvf']:
                 accepted, response = self.drc.send_command(recorder, 'start', mjd='now', mpm='now')
@@ -308,7 +316,7 @@ class Controller():
             elif response['status'] == 'success':
                 rec_extra_info = ''
                 try:
-                    rec_extra_info = f" to file {response['response']['filename']}"
+                    rec_extra_info = f" for {duration/1000.0:.3f} s to file {response['response']['filename']}"
                 except KeyError:
                     pass
                 print(f"recording on {recorder}{rec_extra_info}")
@@ -325,6 +333,8 @@ class Controller():
         dconf = self.conf['dr']
         if recorders is None:
             recorders = dconf['recorders']
+        elif not isinstance(recorders, (list, tuple)):
+            recorders = [recorders,]
 
         # start ms writing
         statuses = []
@@ -343,6 +353,8 @@ class Controller():
         dconf = self.conf['dr']
         if not recorders:
             recorders = dconf['recorders']
+        elif not isinstance(recorders, (list, tuple)):
+            recorders = [recorders,]
 
         for recorder in recorders:
             if recorder in ['drvs', 'drvf']:
