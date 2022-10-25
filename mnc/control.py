@@ -286,7 +286,7 @@ class Controller():
         dconf = self.conf['dr']
         if recorders is None:
             recorders = dconf['recorders']
-        elif not isinstance(recoders, (list, tuple)):
+        elif not isinstance(recorders, (list, tuple)):
             recorders = [recorders,]
 
         # start ms writing
@@ -333,7 +333,7 @@ class Controller():
         dconf = self.conf['dr']
         if recorders is None:
             recorders = dconf['recorders']
-        elif not isinstance(recoders, (list, tuple)):
+        elif not isinstance(recorders, (list, tuple)):
             recorders = [recorders,]
 
         # start ms writing
@@ -353,7 +353,7 @@ class Controller():
         dconf = self.conf['dr']
         if not recorders:
             recorders = dconf['recorders']
-        elif not isinstance(recoders, (list, tuple)):
+        elif not isinstance(recorders, (list, tuple)):
             recorders = [recorders,]
 
         for recorder in recorders:
