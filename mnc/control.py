@@ -304,7 +304,7 @@ class Controller():
                     if duration is not None:
                         accepted, response = self.drc.send_command(recorder, 'record', start_mjd='now', start_mpm='now', duration_ms=duration)
                     else:
-                        print("power beam needs duration")
+                        print("Power beam recordings require a duration")
             except ValueError:
                 pass
             # visibilities
