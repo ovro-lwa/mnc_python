@@ -316,7 +316,7 @@ class Controller():
             elif response['status'] == 'success':
                 rec_extra_info = ''
                 try:
-                    rec_extra_info = f" to file {response['response']['filename']}"
+                    rec_extra_info = f" for {duration/1000.0:.3f} s to file {response['response']['filename']}"
                 except KeyError:
                     pass
                 print(f"recording on {recorder}{rec_extra_info}")
