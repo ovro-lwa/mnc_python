@@ -110,7 +110,7 @@ class Controller():
 
         # data recorder control client
         self.drc = mcs.Client()
-        self.drb = {}
+        self.bfc = {}
 
     def set_arx(self, preset=None):
         """ Set ARX to preset config.
@@ -185,7 +185,7 @@ class Controller():
             recorders = self.conf['dr']['recorders']
 
         # Clear the beamformer state
-        self.drb.clear()
+        self.bfc.clear()
         
         xconf = self.conf['xengines']
 
@@ -240,28 +240,28 @@ class Controller():
                 az = 0
                 el = 90
 
-        if num not in self.drb:
+        if num not in self.bfc:
             if calibrate:
                 cal_directory = self.conf['xengines']['cal_directory']
             else:
                 cal_directory = '/pathshouldnotexist'
-            self.drb[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
+            self.bfc[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
                                                                             npipeline_per_server=self.npipeline,
                                                                             cal_directory=cal_directory, etcdhost=self.etcdhost)
         if track:
-            self.drb[num].set_beam_target(ra, dec=dec)
+            self.bfc[num].set_beam_target(ra, dec=dec)
         else:
-            self.drb[num].set_beam_pointing(az, el)
+            self.bfc[num].set_beam_pointing(az, el)
 
         # overload dest set by default
         if self.conf['xengines']['x_dest_beam_port'] is not None:
             addr = self.conf['xengines']['x_dest_beam_ip']
             port = self.conf['xengines']['x_dest_beam_port']
-            self.drb[num].set_beam_dest(addr=addr[num-1], port=port[num-1])  # TODO: test this on cal-im
+            self.bfc[num].set_beam_dest(addr=addr[num-1], port=port[num-1])  # TODO: test this on cal-im
 
         # track
         if track:
-            t = xengine_beamformer_control.BeamTracker(self.drb[num], update_interval=self.conf['xengines']['update_interval'])
+            t = xengine_beamformer_control.BeamTracker(self.bfc[num], update_interval=self.conf['xengines']['update_interval'])
             t.track(ra, dec=dec)
 
     def status_xengine(self):
@@ -297,7 +297,7 @@ class Controller():
             # power beams
             try:
                 num = int(recorder[2:], 10)
-                if num not in self.drb:
+                if num not in self.bfc:
                     print(f"Must run start_xengine_bf with 'num={num}' before running beamforming data recorders")
                     continue
                 if recorder in [f'dr{n}' for n in range(1,11)]:
