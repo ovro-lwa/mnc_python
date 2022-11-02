@@ -211,7 +211,8 @@ class Controller():
         if 'dr1' in recorders:
             print('Start power beams with "start_xengine_bf" method"')
 
-    def start_xengine_bf(self, num=1, target=None, track=True, calibrate=True):
+    def start_xengine_bf(self, num=1, coord=None, coordtype='celestial', targetname=None,
+                         track=True, calibrate=True):
         """ Starts the xengine for beamformer observation.
         num refers to the beamformer number (1 through 4).
         If track=True, target is treated as celestial coords or by target name
@@ -222,23 +223,17 @@ class Controller():
          - tuple of (az, el) in degrees, if track=False
         """
 
-        if track:
-            if isinstance(target, tuple):
-                ra, dec = target
-            elif isinstance(target, str):
-                ra = target
-                dec = None
-            else:
-                print("No tracking target specified. Pointing at NCP.")
-                ra = 0
-                dec = 90
-        else:
-            if isinstance(target, tuple):
-                az, el = target
-            else:
-                print("No untracked target specified. Pointing at zenith.")
-                az = 0
-                el = 90
+        az, el, ra, dec = None, None, None, None
+        if coord is not None and coordtype is not None and targetname is None:
+            assert isinstance(coord, tuple)
+            if coordtype == 'azel':
+                az, el = coord
+            elif coordtype == 'celestial':
+                ra, dec = coord
+        elif targetname is None:
+            print("Coordinates not fully specified. Pointing at zenith.")
+            az = 0
+            el = 90
 
         if num not in self.bfc:
             if calibrate:
@@ -248,9 +243,11 @@ class Controller():
             self.bfc[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
                                                                             npipeline_per_server=self.npipeline,
                                                                             cal_directory=cal_directory, etcdhost=self.etcdhost)
-        if track:
+        if targetname is not None:
+            self.bfc[num].set_beam_target(targetname)
+        elif ra is not None:
             self.bfc[num].set_beam_target(ra, dec=dec)
-        else:
+        elif az is not None:
             self.bfc[num].set_beam_pointing(az, el)
 
         # overload dest set by default
@@ -262,7 +259,14 @@ class Controller():
         # track
         if track:
             t = xengine_beamformer_control.BeamTracker(self.bfc[num], update_interval=self.conf['xengines']['update_interval'])
-            t.track(ra, dec=dec)
+            if targetname is not None:
+                t.track(targetname)
+            elif ra is not None:
+                t.track(ra, dec=dec)
+            else:
+                print('Not tracking for azel input')
+        else:
+            print('Not tracking')
 
     def status_xengine(self):
         """ to be implemented for more detailed monitor point info
