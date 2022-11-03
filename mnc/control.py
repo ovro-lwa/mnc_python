@@ -168,8 +168,9 @@ class Controller():
                 source_ip = localconf['gbe']
                 source_port = localconf['source_port']
 
-                f.cold_start(program = program, initialize = initialize, test_vectors = test_vectors, sync = sync,
-                             sw_sync = sw_sync, enable_eth = enable_eth, chans_per_packet = chans_per_packet,
+                f.cold_start(program = program, initialize = initialize, #test_vectors = test_vectors, sync = sync,
+#                             sw_sync = sw_sync, enable_eth = enable_eth,
+                             chans_per_packet = chans_per_packet,
                              first_stand_index = first_stand_index, nstand = nstand, macs = macs, source_ip = source_ip,
                              source_port = source_port, dests = dests)
                 
@@ -212,7 +213,7 @@ class Controller():
             print('Start power beams with "start_xengine_bf" method"')
 
     def start_xengine_bf(self, num=1, coord=None, coordtype='celestial', targetname=None,
-                         track=True, calibrate=True):
+                         track=True, calibrate=False):
         """ Starts the xengine for beamformer observation.
         num refers to the beamformer number (1 through 4).
         If track=True, target is treated as celestial coords or by target name
@@ -239,6 +240,7 @@ class Controller():
             if calibrate:
                 cal_directory = self.conf['xengines']['cal_directory']
             else:
+                print('No calibration will be applied')
                 cal_directory = '/pathshouldnotexist'
             self.bfc[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
                                                                             npipeline_per_server=self.npipeline,
