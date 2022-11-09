@@ -135,6 +135,8 @@ class Controller():
         fconf = self.conf['fengines']
         snap2names = fconf['snap2s_inuse']
         chans_per_packet = fconf['chans_per_packet']
+        fft_shift = fconf['fft_shift']
+        eq_coeffs = fconf['eq_coeffs']
         macs = self.conf['xengines']['arp']
 
         dests = []
@@ -168,7 +170,8 @@ class Controller():
                 source_ip = localconf['gbe']
                 source_port = localconf['source_port']
 
-                f.cold_start(program = program, initialize = initialize, #test_vectors = test_vectors, sync = sync,
+                f.cold_start(program = program, initialize = initialize, fft_shift=fft_shift, eq_coeffs=eq_coeffs,
+                             #test_vectors = test_vectors, sync = sync,
 #                             sw_sync = sw_sync, enable_eth = enable_eth,
                              chans_per_packet = chans_per_packet,
                              first_stand_index = first_stand_index, nstand = nstand, macs = macs, source_ip = source_ip,
@@ -304,8 +307,7 @@ class Controller():
             try:
                 num = int(recorder[2:], 10)
                 if num not in self.bfc:
-                    print(f"Must run start_xengine_bf with 'num={num}' before running beamforming data recorders")
-                    continue
+                    print(f"Warning: you should run start_xengine_bf with 'num={num}' before running beamforming data recorders. Proceeding...")
                 if recorder in [f'dr{n}' for n in range(1,11)]:
                     if duration is not None:
                         accepted, response = self.drc.send_command(recorder, 'record', start_mjd='now', start_mpm='now', duration_ms=duration)
@@ -323,7 +325,7 @@ class Controller():
                 rec_extra_info = ''
                 try:
                     rec_extra_info = f" for {duration/1000.0:.3f} s to file {response['response']['filename']}"
-                except KeyError:
+                except (KeyError, TypeError):
                     pass
                 print(f"recording on {recorder}{rec_extra_info}")
             else:
