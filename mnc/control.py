@@ -179,14 +179,17 @@ class Controller():
                 
                 f.print_status_all()
 
-    def start_xengine(self, recorders=None):
+    def configure_xengine(self, recorders=None, calibratebeams=False):
         """ Start xengines listed in configuration file.
         Recorders is list of recorders to configure output to. Defaults to those in config file.
-        Supported modes "drvs" (slow vis), "drvf" (fast vis), "dr1" (power beam)
+        Supported modes "drvs" (slow vis), "drvf" (fast vis), "dr[n]" (power beams)
         """
 
+        dconf = self.conf['dr']
         if recorders is None:
-            recorders = self.conf['dr']['recorders']
+            recorders = dconf['recorders']
+        elif not isinstance(recorders, (list, tuple)):
+            recorders = [recorders,]
 
         # Clear the beamformer state
         self.bfc.clear()
@@ -212,13 +215,32 @@ class Controller():
         else:
             print("Not configuring x-engine for fast visibilities")            
 
-        if 'dr1' in recorders:
-            print('Start power beams with "start_xengine_bf" method"')
+        if calibratebeams:
+            cal_directory = self.conf['xengines']['cal_directory']
+        else:
+            cal_directory = '/pathshouldnotexist'
 
-    def start_xengine_bf(self, num=1, coord=None, coordtype='celestial', targetname=None,
-                         track=True, calibrate=False):
-        """ Starts the xengine for beamformer observation.
-        num refers to the beamformer number (1 through 4).
+        for recorder in recorders:
+            # try to skip recorders not named "dr<n>"
+            if (len(recorder) != 3) and (recorder[:2] == 'dr'):
+                continue
+
+            num = int(recorder[2:])
+            print(f"Configuring x-engine for beam {num}")
+            self.bfc[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
+                                                                            npipeline_per_server=self.npipeline,
+                                                                            cal_directory=cal_directory, etcdhost=self.etcdhost)
+            # overload dest set by default
+            if self.conf['xengines']['x_dest_beam_port'] is not None:
+                addr = self.conf['xengines']['x_dest_beam_ip']
+                port = self.conf['xengines']['x_dest_beam_port']
+                self.bfc[num].set_beam_dest(addr=addr[num-1], port=port[num-1])
+
+
+    def control_bf(self, num=1, coord=None, coordtype='celestial', targetname=None,
+                   track=True):
+        """ Point and track beamformers.
+        num refers to the beamformer number (1 through 8).
         If track=True, target is treated as celestial coords or by target name
         If track=False, target is treated as (az, el)
         target can be:
@@ -239,15 +261,6 @@ class Controller():
             az = 0
             el = 90
 
-        if num not in self.bfc:
-            if calibrate:
-                cal_directory = self.conf['xengines']['cal_directory']
-            else:
-                print('No calibration will be applied')
-                cal_directory = '/pathshouldnotexist'
-            self.bfc[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
-                                                                            npipeline_per_server=self.npipeline,
-                                                                            cal_directory=cal_directory, etcdhost=self.etcdhost)
         if targetname is not None:
             self.bfc[num].set_beam_target(targetname)
         elif ra is not None:
@@ -255,14 +268,11 @@ class Controller():
         elif az is not None:
             self.bfc[num].set_beam_pointing(az, el)
 
-        # overload dest set by default
-        if self.conf['xengines']['x_dest_beam_port'] is not None:
-            addr = self.conf['xengines']['x_dest_beam_ip']
-            port = self.conf['xengines']['x_dest_beam_port']
-            self.bfc[num].set_beam_dest(addr=addr[num-1], port=port[num-1])  # TODO: test this on cal-im
+        if self.bfc[num].cal_set is False:
+            print(f'beam {num} calibration not set')
 
         # track
-        if track:
+        if track and num in self.bfc:
             t = xengine_beamformer_control.BeamTracker(self.bfc[num], update_interval=self.conf['xengines']['update_interval'])
             if targetname is not None:
                 t.track(targetname)
@@ -270,6 +280,8 @@ class Controller():
                 t.track(ra, dec=dec)
             else:
                 print('Not tracking for azel input')
+        elif num not in self.bfc:
+            print(f'xengine not configured for beam {num}')
         else:
             print('Not tracking')
 

@@ -149,7 +149,7 @@ fengines:
 
 # configuration of x-engines (correlator beamformers) running on GPUs
 xengines:
-  xhosts: ["lxdlwagpu01", "lxdlwagpu02", "lxdlwagpu03", "lxdlwagpu04", "lxdlwagpu05", "lxdlwagpu06", "lxdlwagpu07", "lxdlwagpu08"]
+  xhosts: ["lxdlwagpu01"]
   nxpipeline: 4
   arp:
     # lwa-gpu01
@@ -217,10 +217,10 @@ xengines:
     10.41.0.72-20000: [3424, 3520]
     10.41.0.24-10000: [3520, 3616]
     10.41.0.24-20000: [3616, 3712]
-  x_dest_corr_name: ["lwacalim01", "lwacalim02", "lwacalim03", "lwacalim04", "lwacalim05", "lwacalim06", "lwacalim07", "lwacalim08"]  # where gpu servers send data (usually maps one-to-one from gpu to calim node)
+  x_dest_corr_name: ["lwacalim01"]
   x_dest_corr_slow_port: [10001, 10001, 10002, 10002]
   x_dest_corr_fast_port: [11001, 11001, 11002, 11002]
-  x_dest_beam_ip: ["10.41.0.76", "10.41.0.76", "10.41.0.77", "10.41.0.77", "10.41.0.78", "10.41.0.78", "10.41.0.79", "10.41.0.79"]
+  x_dest_beam_ip: ["0.0.0.0"]
   x_dest_beam_port: [20001, 20002, 20001, 20002, 20001, 20002, 20001, 20002]
   cal_directory: "/home/pipeline/caltables/latest/"   # location on destination server of calibration tables
   update_interval: 15  # beamformer tracking update cadence in seconds
