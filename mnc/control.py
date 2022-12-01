@@ -4,6 +4,7 @@ import glob
 import numpy as np
 import matplotlib
 import glob
+from dsautils import dsa_store
 
 from lwautils import lwa_arx   # arx
 
@@ -11,7 +12,7 @@ matplotlib.use('Agg')
 
 
 try:
-    from lwa_f import snap2_fengine, helpers  # fengine
+    from lwa_f import snap2_fengine, helpers, snap2_feng_etcd_client  # fengine
 except ImportError:
     print('No f-eng library found. Skipping.')
 try:
@@ -178,6 +179,19 @@ class Controller():
                              source_port = source_port, dests = dests)
                 
                 f.print_status_all()
+
+    def status_fengine(self):
+        """ Use snap2 etcd client to poll for stats on each fengine.
+        """
+
+        status = {}
+        ls = dsa_store.DsaStore()
+        for snap2name in snap2names:
+            lwa_fe = snap2_feng_etcd_client.Snap2FengineEtcdClient(snap2name, int(snap2name.lstrip('snap')))
+            lwa_fe.poll_stats()
+            status[snap2name] = ls.get_dict(lwa_fe.mon_key)['stats']
+
+        return status
 
     def configure_xengine(self, recorders=None, calibratebeams=False):
         """ Start xengines listed in configuration file.
