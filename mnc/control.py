@@ -180,18 +180,26 @@ class Controller():
                 
                 f.print_status_all()
 
-    def status_fengine(self):
+    def status_fengine(self, poll=False):
         """ Use snap2 etcd client to poll for stats on each fengine.
+        poll of True will refresh the fengine statistics.
         """
 
-        status = {}
+        snap2names = self.conf['fengines']['snap2s_inuse']
+        stats = {}
         ls = dsa_store.DsaStore()
+
         for snap2name in snap2names:
             lwa_fe = snap2_feng_etcd_client.Snap2FengineEtcdClient(snap2name, int(snap2name.lstrip('snap')))
-            lwa_fe.poll_stats()
-            status[snap2name] = ls.get_dict(lwa_fe.mon_key)['stats']
+            if poll:
+                lwa_fe.poll_stats()
+            dd = ls.get_dict(lwa_fe.mon_key)
+            if dd is not None:
+                stats[snap2name] = dd['stats']
+            else:
+                stats[snap2name] = None
 
-        return status
+        return stats
 
     def configure_xengine(self, recorders=None, calibratebeams=False):
         """ Start xengines listed in configuration file.
