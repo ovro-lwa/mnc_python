@@ -190,10 +190,14 @@ class Controller():
         ls = dsa_store.DsaStore()
 
         for snap2name in snap2names:
-            lwa_fe = snap2_feng_etcd_client.Snap2FengineEtcdClient(snap2name, int(snap2name.lstrip('snap')))
+            snap2num = int(snap2name.lstrip('snap'))
+
             if poll:
+                lwa_fe = snap2_feng_etcd_client.Snap2FengineEtcdClient(snap2name, int(snap2name.lstrip('snap')))
                 lwa_fe.poll_stats()
-            dd = ls.get_dict(lwa_fe.mon_key)
+
+            dd = ls.get_dict(f'/mon/snap/{snap2num}')
+
             if dd is not None:
                 stats[snap2name] = dd['stats']
             else:
