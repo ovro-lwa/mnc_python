@@ -110,6 +110,8 @@ class Controller():
         self.pipelines = p.pipelines
 
         # data recorder control client
+        self.drvnums = [ip[-2:]+str(port)[-2:] for (ip, port) in zip(self.x_dest_corr_ip,
+                                                                     self.conf['xengines']['x_dest_corr_slow_port']*self.nhosts)]
         self.drc = mcs.Client()
         self.bfc = {}
 
