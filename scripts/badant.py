@@ -22,11 +22,11 @@ statsdict = mp['stats']['input']
 # threshold on 'powernn', 'meannn', 'rmsnn'
 # map to bad antenna
 
-# reserve /mon/antvisflag/n for flags identified from visibilities
+# maybe reserve /mon/antvisflag/n for flags identified from visibilities by marin?
 # etcd value: {'time': nnn, 'flagged': True/False}
-
-# temperature?
 
 # store antenna flag info at /mon/anthealth/n
 # idea for etcd value: {'time': nnn, 'flagged': True/False, 'arxflag': True/False, 'snapflag', 'overflowflag', 'visflag' etc...}
 # "flagged" is result of logical and of other fields
+
+# consider no-booleans, e.g., temperature for gain corrections
