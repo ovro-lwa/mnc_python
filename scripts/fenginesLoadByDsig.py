@@ -16,26 +16,25 @@ dsig4 = config['eq4']
 dsig5 = config['eq5']
 #print(len(coef), len(coef[0]), len(coef[1]), len(coef[2]), len(coef[3]))
 
-import myfengines as f
 from mnc.fengFunctions import dsig2feng, myfengines
 
 f = myfengines()
 
 for i in range(11):
-    f.f[i].pfb.set_fft_shift(0x1FFF)  # Request shift for all
+    f[i].pfb.set_fft_shift(0x1FFF)  # Request shift for all
     print('snap%02d:'%(i+1)," fft shift set")
 
 dsigDone = []
 
 for i in dsig0:
     loc = dsig2feng(i)
-    f.f[loc[0]-1].eq.set_coeffs(loc[1],coef[0])
+    f[loc[0]-1].eq.set_coeffs(loc[1],coef[0])
     dsigDone.append(i)
 print(dsig0)
     
 for i in dsig1:
     loc = dsig2feng(i)
-    f.f[loc[0]-1].eq.set_coeffs(loc[1],coef[1])
+    f[loc[0]-1].eq.set_coeffs(loc[1],coef[1])
     dsigDone.append(i)
 print(dsig1)
 
@@ -43,32 +42,32 @@ print(dsig1)
 for i in dsig2:
     loc = dsig2feng(i)
     #print('dsig2: ',i,loc[0],loc[1])
-    f.f[loc[0]-1].eq.set_coeffs(loc[1],coef[2])
+    f[loc[0]-1].eq.set_coeffs(loc[1],coef[2])
     dsigDone.append(i)
 print(dsig2)
 
 #print(coef[3])
 for i in dsig3:
     loc = dsig2feng(i)
-    f.f[loc[0]-1].eq.set_coeffs(loc[1],coef[3])
+    f[loc[0]-1].eq.set_coeffs(loc[1],coef[3])
     dsigDone.append(i)
 print(dsig3)
 
 for i in dsig4:
     loc = dsig2feng(i)
-    f.f[loc[0]-1].eq.set_coeffs(loc[1],coef[4])
+    f[loc[0]-1].eq.set_coeffs(loc[1],coef[4])
     dsigDone.append(i)
 print(dsig4)
 
 for i in dsig5:
     loc = dsig2feng(i)
-    f.f[loc[0]-1].eq.set_coeffs(loc[1],coef[5])
+    f[loc[0]-1].eq.set_coeffs(loc[1],coef[5])
     dsigDone.append(i)
 print(dsig5)
 
 for i in range(704):  # all others
     if i in dsigDone: continue
     loc = dsig2feng(i)
-    f.f[loc[0]-1].eq.set_coeffs(loc[1],coef[0])
+    f[loc[0]-1].eq.set_coeffs(loc[1],coef[0])
     
 
