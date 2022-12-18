@@ -11,7 +11,7 @@ Welcome to mnc_python's documentation!
    :maxdepth: 2
 
    
-.. automodule:: mnc.common
+.. automodule:: mnc.control
    :members:
 	       
 
