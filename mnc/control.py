@@ -202,10 +202,12 @@ class Controller():
 
             if dd is not None:
                 stats[snap2name] = dd['stats']
+                timestamp = dd['timestamp']
             else:
                 stats[snap2name] = None
+                timestamp = None
 
-        return stats
+        return timestamp, stats
 
     def configure_xengine(self, recorders=None, calibratebeams=False):
         """ Start xengines listed in configuration file.
