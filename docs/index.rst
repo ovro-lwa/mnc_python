@@ -5,7 +5,7 @@ mnc_python documentation
    :maxdepth: 2
 
    
-.. automodule:: mnc.control
+.. autoclass:: mnc.control.Controller
    :members:
 	       
 
