@@ -8,6 +8,8 @@ Major subsystems include: ARX, F-engines, X-engines, and Cal-Im cluster. Many su
 .. toctree::
    :maxdepth: 1
 
+   ExampleObs
+   api
 
 Indices and tables
 ==================
