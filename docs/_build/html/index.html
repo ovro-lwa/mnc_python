@@ -6,7 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
-    <title>mnc_python documentation &#8212; mnc_python  documentation</title>
+    <title>OVRO-LWA mnc_python documentation &#8212; mnc_python  documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
@@ -15,6 +15,7 @@
     <script src="_static/doctools.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Example Observations with OVRO-LWA" href="ExampleObs.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -31,111 +32,21 @@
 
           <div class="body" role="main">
             
-  <section id="mnc-python-documentation">
-<h1>mnc_python documentation<a class="headerlink" href="#mnc-python-documentation" title="Permalink to this headline">¶</a></h1>
+  <section id="ovro-lwa-mnc-python-documentation">
+<h1>OVRO-LWA mnc_python documentation<a class="headerlink" href="#ovro-lwa-mnc-python-documentation" title="Permalink to this headline">¶</a></h1>
+<p>The OVRO-LWA Monitor and Control system provides access to analog, digital, and computing systems. This is used to support a range of users, such as Observer on Duty (OoD), engineers, and science users.</p>
+<p>Major subsystems include: ARX, F-engines, X-engines, and Cal-Im cluster. Many subsystems have additional monitor and control software written by subsystem designers. mnc_python provides a simple, high-level access to those subsystems via python.</p>
 <div class="toctree-wrapper compound">
-</div>
-<dl class="py class">
-<dt class="sig sig-object py" id="mnc.control.Controller">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mnc.control.</span></span><span class="sig-name descname"><span class="pre">Controller</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'config/lwa_config.yaml'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">etcdhost</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xhosts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">npipeline</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller" title="Permalink to this definition">¶</a></dt>
-<dd><p>Parse configuration and control all subsystems in uniform manner.
-Ideally, will also make it easy to monitor basic system status.
-etcdhost is used by x-engine. data recorders use value set in mnc/common.py code.</p>
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.configure_xengine">
-<span class="sig-name descname"><span class="pre">configure_xengine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">recorders</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">calibratebeams</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.configure_xengine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.configure_xengine" title="Permalink to this definition">¶</a></dt>
-<dd><p>Start xengines listed in configuration file.
-Recorders is list of recorders to configure output to. Defaults to those in config file.
-Supported modes “drvs” (slow vis), “drvf” (fast vis), “dr[n]” (power beams)</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.control_bf">
-<span class="sig-name descname"><span class="pre">control_bf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coord</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'celestial'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">targetname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">track</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.control_bf"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.control_bf" title="Permalink to this definition">¶</a></dt>
-<dd><p>Point and track beamformers.
-num refers to the beamformer number (1 through 8).
-If track=True, target is treated as celestial coords or by target name
-If track=False, target is treated as (az, el)
-target can be:</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>source name (‘zenith’, ‘sun’) or</p></li>
-<li><p>tuple of (ra, dec) in (hourangle, degrees).</p></li>
-<li><p>tuple of (az, el) in degrees, if track=False</p></li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="ExampleObs.html">Example Observations with OVRO-LWA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ExampleObs.html#id1">Example Observations with OVRO-LWA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ExampleObs.html#indices-and-tables">Indices and tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">mnc_python class API</a><ul class="simple">
 </ul>
-</div></blockquote>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.parse_config">
-<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">parse_config</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config_file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.parse_config"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.parse_config" title="Permalink to this definition">¶</a></dt>
-<dd><p>Parse yaml format config_file and return dict</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.set_arx">
-<span class="sig-name descname"><span class="pre">set_arx</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">preset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.set_arx"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.set_arx" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set ARX to preset config.
-Defaults to preset in configuration file.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.set_properties">
-<span class="sig-name descname"><span class="pre">set_properties</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.set_properties"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.set_properties" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set properties, then recalculate config properties.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.start_dr">
-<span class="sig-name descname"><span class="pre">start_dr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">recorders</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">duration</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.start_dr"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.start_dr" title="Permalink to this definition">¶</a></dt>
-<dd><p>Start data recorders listed recorders.
-Defaults to starting those listed in configuration file.
-duration is power beam recording in milliseconds.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.start_fengine">
-<span class="sig-name descname"><span class="pre">start_fengine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">initialize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">program</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">force</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.start_fengine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.start_fengine" title="Permalink to this definition">¶</a></dt>
-<dd><p>Start the fengines on all snap2s.
-Defaults to all listed in “snap2s_inuse” field of configuration file.
-Optionally can initialize and program.
-force will run cold_start method regardless of current state.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.status_dr">
-<span class="sig-name descname"><span class="pre">status_dr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">recorders</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.status_dr"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.status_dr" title="Permalink to this definition">¶</a></dt>
-<dd><p>Print data recorder info monitor point</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.status_fengine">
-<span class="sig-name descname"><span class="pre">status_fengine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">poll</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.status_fengine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.status_fengine" title="Permalink to this definition">¶</a></dt>
-<dd><p>Use snap2 etcd client to poll for stats on each fengine.
-poll of True will refresh the fengine statistics.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.status_xengine">
-<span class="sig-name descname"><span class="pre">status_xengine</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.status_xengine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.status_xengine" title="Permalink to this definition">¶</a></dt>
-<dd><p>to be implemented for more detailed monitor point info</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.stop_dr">
-<span class="sig-name descname"><span class="pre">stop_dr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">recorders</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.stop_dr"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.stop_dr" title="Permalink to this definition">¶</a></dt>
-<dd><p>Stop data recorders in list recorders.
-Defaults to stopping those listed in configuration file.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.stop_xengine">
-<span class="sig-name descname"><span class="pre">stop_xengine</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.stop_xengine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.stop_xengine" title="Permalink to this definition">¶</a></dt>
-<dd><p>Stop xengines listed in configuration file.</p>
-</dd></dl>
-
-</dd></dl>
-
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#indices-and-tables">Indices and tables</a></li>
+</ul>
+</div>
 </section>
 <section id="indices-and-tables">
 <h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
@@ -163,11 +74,19 @@ Defaults to stopping those listed in configuration file.</p>
 
 
 <h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="ExampleObs.html">Example Observations with OVRO-LWA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ExampleObs.html#id1">Example Observations with OVRO-LWA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ExampleObs.html#indices-and-tables">Indices and tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">mnc_python class API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#indices-and-tables">Indices and tables</a></li>
+</ul>
 
 <div class="relations">
 <h3>Related Topics</h3>
 <ul>
   <li><a href="#">Documentation overview</a><ul>
+      <li>Next: <a href="ExampleObs.html" title="next chapter">Example Observations with OVRO-LWA</a></li>
   </ul></li>
 </ul>
 </div>
