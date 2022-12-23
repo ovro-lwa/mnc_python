@@ -1,10 +1,6 @@
 mnc_python class API
 ======================================
 
-.. toctree::
-   :maxdepth: 2
-
-   
 .. autoclass:: mnc.control.Controller
    :members:
 
@@ -15,9 +11,5 @@ mnc_python class API
    :members:
 
 
-Indices and tables
-==================
-
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`

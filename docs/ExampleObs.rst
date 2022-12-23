@@ -1,15 +1,8 @@
 Example Observations with OVRO-LWA
 ========================================
 
+To do...
 
-Example Observations with OVRO-LWA
-========================================
-
-
-
-Indices and tables
-========================================
 
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`
