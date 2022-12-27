@@ -410,8 +410,8 @@ class Controller():
             if recorder in ['drvs', 'drvf']:
                 accepted, response = self.drc.send_command(recorder, 'stop', mjd='now', mpm='now')
             elif recorder[:2] == 'dr':
-                queue = 0 # TODO: how can we get this?
-                accepted, response = self.drc.send_command(queue, 'cancel', mjd='now', mpm='now')
+                queue = 0  # current observation
+                accepted, response = self.drc.send_command(recorder, 'cancel', mjd='now', mpm='now', queue=queue)
 
             if not accepted:
                 print(f"WARNING: no response from {recorder}")
