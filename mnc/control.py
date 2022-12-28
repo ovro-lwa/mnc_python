@@ -139,8 +139,12 @@ class Controller():
         snap2names = fconf['snap2s_inuse']
         chans_per_packet = fconf['chans_per_packet']
         fft_shift = fconf['fft_shift']
-        eq_coeffs = fconf['eq_coeffs']
         macs = self.conf['xengines']['arp']
+
+# TODO: set fengine eq settings in /cfg
+#        ls = dsa_store.DsaStore()
+#        cnf_feng = ls.get_dict("/cfg/fengine")
+#        eq_coeffs = cnf_feng["eq_coeffs"]
 
         dests = []
         for xeng, chans in self.conf['xengines']['chans'].items():
@@ -173,7 +177,7 @@ class Controller():
                 source_ip = localconf['gbe']
                 source_port = localconf['source_port']
 
-                f.cold_start(program = program, initialize = initialize, fft_shift=fft_shift, eq_coeffs=eq_coeffs,
+                f.cold_start(program = program, initialize = initialize, fft_shift=fft_shift,
                              #test_vectors = test_vectors, sync = sync,
 #                             sw_sync = sw_sync, enable_eth = enable_eth,
                              chans_per_packet = chans_per_packet,
@@ -411,7 +415,7 @@ class Controller():
                 accepted, response = self.drc.send_command(recorder, 'stop', mjd='now', mpm='now')
             elif recorder[:2] == 'dr':
                 queue = 0  # current observation
-                accepted, response = self.drc.send_command(recorder, 'cancel', mjd='now', mpm='now', queue=queue)
+                accepted, response = self.drc.send_command(recorder, 'cancel', queue_number=queue)
 
             if not accepted:
                 print(f"WARNING: no response from {recorder}")
