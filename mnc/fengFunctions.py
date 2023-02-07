@@ -1,5 +1,6 @@
 # myfengFunctions.py
-# F engine control
+# Low-level F-engine control
+# by Larry D'Addario with small modifications by Casey Law
 
 # 20220310 - add adcPowerSave().
 # 20221006 - add get_spectra().
