@@ -29,7 +29,7 @@ cfgkeys = config.keys()
 coef = config['coef']   # must include this key
       
 for i in range(11):
-    f.f[i].pfb.set_fft_shift(0x1FFF)  # Request shift at all FFT stages
+    f[i].pfb.set_fft_shift(0x1FFF)  # Request shift at all FFT stages
     print('snap%02d:'%(i+1)," fft shift set")
 
 dsigDone = []
@@ -39,7 +39,7 @@ if k in cfgkeys:
     dsig = config[k]
     for i in dsig:
         loc = dsig2feng(i)
-        f.f[loc[0]-1].eq.set_coeffs(loc[1],coef[0])
+        f[loc[0]-1].eq.set_coeffs(loc[1],coef[0])
         dsigDone.append(i)
     print(dsig)
 
@@ -48,7 +48,7 @@ if k in cfgkeys:
     dsig = config[k]
     for i in dsig:
         loc = dsig2feng(i)
-        f.f[loc[0]-1].eq.set_coeffs(loc[1],coef[1])
+        f[loc[0]-1].eq.set_coeffs(loc[1],coef[1])
         dsigDone.append(i)
     print(dsig)
 
@@ -57,7 +57,7 @@ if k in cfgkeys:
     dsig = config[k]
     for i in dsig:
         loc = dsig2feng(i)
-        f.f[loc[0]-1].eq.set_coeffs(loc[1],coef[2])
+        f[loc[0]-1].eq.set_coeffs(loc[1],coef[2])
         dsigDone.append(i)
     print(dsig)
 
@@ -66,7 +66,7 @@ if k in cfgkeys:
     dsig = config[k]
     for i in dsig:
         loc = dsig2feng(i)
-        f.f[loc[0]-1].eq.set_coeffs(loc[1],coef[3])
+        f[loc[0]-1].eq.set_coeffs(loc[1],coef[3])
         dsigDone.append(i)
     print(dsig)
 
@@ -75,7 +75,7 @@ if k in cfgkeys:
     dsig = config[k]
     for i in dsig:
         loc = dsig2feng(i)
-        f.f[loc[0]-1].eq.set_coeffs(loc[1],coef[4])
+        f[loc[0]-1].eq.set_coeffs(loc[1],coef[4])
         dsigDone.append(i)
     print(dsig)
 
@@ -84,7 +84,7 @@ if k in cfgkeys:
     dsig = config[k]
     for i in dsig:
         loc = dsig2feng(i)
-        f.f[loc[0]-1].eq.set_coeffs(loc[1],coef[5])
+        f[loc[0]-1].eq.set_coeffs(loc[1],coef[5])
         dsigDone.append(i)
     print(dsig)
 
@@ -93,7 +93,7 @@ if k in cfgkeys:
     dsig = config[k]
     for i in dsig:
         loc = dsig2feng(i)
-        f.f[loc[0]-1].eq.set_coeffs(loc[1],coef[6])
+        f[loc[0]-1].eq.set_coeffs(loc[1],coef[6])
         dsigDone.append(i)
     print(dsig)
 
@@ -101,7 +101,7 @@ if k in cfgkeys:
 for i in range(704):  # all others
     if i in dsigDone: continue
     loc = dsig2feng(i)
-    f.f[loc[0]-1].eq.set_coeffs(loc[1],coef[0])
+    f[loc[0]-1].eq.set_coeffs(loc[1],coef[0])
 
     
 #======================
