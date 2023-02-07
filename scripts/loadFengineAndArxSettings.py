@@ -8,6 +8,10 @@
 import sys
 import scipy.io as mat
 import time
+from mnc.fengFunctions import myfengines
+from mnc import myarx as a
+from mnc.fengFunctions import dsig2feng
+
 
 # Read configuration data file
 config = mat.loadmat(sys.argv[1],squeeze_me=True)
@@ -19,8 +23,8 @@ print('Data file internal time: ',time.asctime(time.gmtime(config['time'])))
 # LOAD F ENGINE SETTINGS
 #-----------------------
 
-import myfengines as f
-from fengFunctions import dsig2feng
+f = myfengines()
+
 cfgkeys = config.keys()
 coef = config['coef']   # must include this key
       
@@ -103,8 +107,6 @@ for i in range(704):  # all others
 #======================
 # NOW LOAD ARX SETTINGS
 #----------------------
-
-import myarx as a
 
 adrs = config['adrs']
 settings = config['settings']
