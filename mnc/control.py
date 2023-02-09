@@ -332,10 +332,11 @@ class Controller():
 
         self.pcontroller.stop_pipelines()
 
-    def start_dr(self, recorders=None, duration=None):
+    def start_dr(self, recorders=None, duration=None, time_avg=None):
         """ Start data recorders listed recorders.
         Defaults to starting those listed in configuration file.
         duration is power beam recording in milliseconds.
+        time_avg is power beam averaging time in milliseconds (converted to next lower power of 2).
         """
 
         dconf = self.conf['dr']
@@ -356,7 +357,11 @@ class Controller():
                     print(f"Warning: you should run start_xengine_bf with 'num={num}' before running beamforming data recorders. Proceeding...")
                 if recorder in [f'dr{n}' for n in range(1,11)]:
                     if duration is not None:
-                        accepted, response = self.drc.send_command(recorder, 'record', start_mjd='now', start_mpm='now', duration_ms=duration)
+                        if time_avg is not None:
+                            time_avg = 2 ** int(np.log2(time_avg))  # set to next lower power of 2
+                        accepted, response = self.drc.send_command(recorder, 'record', start_mjd='now',
+                                                                   start_mpm='now', duration_ms=duration,
+                                                                   time_avg=time_avg)
                     else:
                         print("Power beam recordings require a duration")
             except ValueError:
@@ -370,7 +375,11 @@ class Controller():
             elif response['status'] == 'success':
                 rec_extra_info = ''
                 try:
-                    rec_extra_info = f" for {duration/1000.0:.3f} s to file {response['response']['filename']}"
+                    if time_avg is None:
+                        ta = '1'
+                    else:
+                        ta = str(time_avg)
+                    rec_extra_info = f" for {duration/1000.0:.3f} s and {ta} ms averaging to file {response['response']['filename']}"
                 except (KeyError, TypeError):
                     pass
                 print(f"recording on {recorder}{rec_extra_info}")
