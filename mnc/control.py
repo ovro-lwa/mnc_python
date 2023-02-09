@@ -94,8 +94,9 @@ class Controller():
         if self.npipeline is None:
             self.npipeline = self.conf["xengines"]["nxpipeline"]
 
-        drip_mapping = self.conf["drip_mapping"]
-        drips = [ip for name in self.conf["xengines"]["x_dest_corr_name"] for ip in drip_mapping[name]]
+        # select calim names/ips for selected xhosts
+        calim_name = [self.conf["xengines"]["x_dest_corr_name"][gpu_name] for gpu_name in self.xhosts]
+        drips = [self.conf["drip_mapping"][name] for name in calim_name]
         self.x_dest_corr_ip = list(sorted(drips*(self.npipeline)))
         self.x_dest_corr_slow_port = self.conf["xengines"]["x_dest_corr_slow_port"]
         self.x_dest_corr_fast_port = self.conf["xengines"]["x_dest_corr_fast_port"]
