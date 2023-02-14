@@ -56,7 +56,7 @@ class Controller():
             if f"dr{b}" in self.conf['dr']['recorders']:
                 modes.append(f"beam{b}")
         print(f"Loaded configuration for {self.nhosts} x-engine host(s) running {self.npipeline} pipeline(s) each")
-        print(f"Supported modes are: {','.join(modes)}")
+        print(f"Supported recorder modes are: {','.join(modes)}")
         print(f"etcd server being used is: {self.etcdhost}")
 
     @staticmethod
@@ -142,11 +142,6 @@ class Controller():
         fft_shift = fconf['fft_shift']
         macs = self.conf['xengines']['arp']
 
-# TODO: set fengine eq settings in /cfg
-#        ls = dsa_store.DsaStore()
-#        cnf_feng = ls.get_dict("/cfg/fengine")
-#        eq_coeffs = cnf_feng["eq_coeffs"]
-
         dests = []
         for xeng, chans in self.conf['xengines']['chans'].items():
             dest_ip = xeng.split('-')[0]
@@ -217,7 +212,7 @@ class Controller():
     def configure_xengine(self, recorders=None, calibratebeams=False):
         """ Start xengines listed in configuration file.
         Recorders is list of recorders to configure output to. Defaults to those in config file.
-        Supported modes "drvs" (slow vis), "drvf" (fast vis), "dr[n]" (power beams)
+        Supported recorders are "drvs" (slow vis), "drvf" (fast vis), "dr[n]" (power beams)
         """
 
         dconf = self.conf['dr']
@@ -323,9 +318,9 @@ class Controller():
     def status_xengine(self):
         """ to be implemented for more detailed monitor point info
         """
-        print("Pipeline id, status:")
+        print("Pipeline id: connection, up")
         for pipeline in self.pipelines:
-            print(pipeline.pipeline_id, pipeline.check_connection())
+            print(f'{pipeline.pipeline_id}: {pipeline.check_connection()}, {pipeline.pipeline_is_up()}')
 
     def stop_xengine(self):
         """ Stop xengines listed in configuration file.
@@ -333,11 +328,12 @@ class Controller():
 
         self.pcontroller.stop_pipelines()
 
-    def start_dr(self, recorders=None, duration=None, time_avg=None):
+    def start_dr(self, recorders=None, duration=None, time_avg=1):
         """ Start data recorders listed recorders.
         Defaults to starting those listed in configuration file.
+        Recorder list can be overloaded with 'drvs' (etc) or individual recorders (e.g., 'drvs7601').
         duration is power beam recording in milliseconds.
-        time_avg is power beam averaging time in milliseconds (converted to next lower power of 2).
+        time_avg is power beam averaging time in milliseconds (integer converted to next lower power of 2).
         """
 
         dconf = self.conf['dr']
@@ -358,8 +354,8 @@ class Controller():
                     print(f"Warning: you should run start_xengine_bf with 'num={num}' before running beamforming data recorders. Proceeding...")
                 if recorder in [f'dr{n}' for n in range(1,11)]:
                     if duration is not None:
-                        if time_avg is not None:
-                            time_avg = 2 ** int(np.log2(time_avg))  # set to next lower power of 2
+                        assert isinstance(time_avg, int)
+                        time_avg = 2 ** int(np.log2(time_avg))  # set to next lower power of 2
                         accepted, response = self.drc.send_command(recorder, 'record', start_mjd='now',
                                                                    start_mpm='now', duration_ms=duration,
                                                                    time_avg=time_avg)
@@ -367,8 +363,9 @@ class Controller():
                         print("Power beam recordings require a duration")
             except ValueError:
                 pass
+
             # visibilities
-            if recorder in ['drvs', 'drvf']:
+            if recorder in ['drvs', 'drvf'] + ['drvs' + num for num in self.drvnums]:
                 accepted, response = self.drc.send_command(recorder, 'start', mjd='now', mpm='now')
 
             if not accepted:
@@ -376,11 +373,7 @@ class Controller():
             elif response['status'] == 'success':
                 rec_extra_info = ''
                 try:
-                    if time_avg is None:
-                        ta = '1'
-                    else:
-                        ta = str(time_avg)
-                    rec_extra_info = f" for {duration/1000.0:.3f} s and {ta} ms averaging to file {response['response']['filename']}"
+                    rec_extra_info = f" for {duration/1000.0:.3f} s and {time_avg} ms averaging to file {response['response']['filename']}"
                 except (KeyError, TypeError):
                     pass
                 print(f"recording on {recorder}{rec_extra_info}")
