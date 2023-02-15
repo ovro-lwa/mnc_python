@@ -29,7 +29,7 @@ print('Data file internal time: ',time.asctime(time.gmtime(config['time'])))
 #-------------------------------------
 
 #import myfengines as f
-from fengFunctions import dsig2feng
+from mnc.fengFunctions import dsig2feng
 from lwa_f import snap2_feng_etcd_client
 ec = snap2_feng_etcd_client.Snap2FengineEtcdControl(ETCDHOST)
 
@@ -159,7 +159,7 @@ if 'delay_dsig' in config.keys():
 # NOW LOAD ARX SETTINGS
 #----------------------
 
-import myarx as a
+import mnc.myarx as a
 
 adrs = config['adrs']
 settings = config['settings']
