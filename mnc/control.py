@@ -222,7 +222,11 @@ class Controller():
         # slow
         if 'drvs' in recorders:
             logger.info("Configuring x-engine for slow visibilities")
-            self.pcontroller.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_slow_port)  # iterates over all slow corr outputs
+            try:
+                self.pcontroller.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_slow_port)  # iterates over all slow corr outputs
+            except KeyError:
+                logger.error("KeyError when configuring correlator. Are data being sent from f to x-engines?")
+
         else:
             logger.info("Not configuring x-engine for slow visibilities")            
 
@@ -245,9 +249,15 @@ class Controller():
 
             num = int(recorder[2:])
             logger.info(f"Configuring x-engine for beam {num}")
-            self.bfc[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
-                                                                            npipeline_per_server=self.npipeline,
-                                                                            cal_directory=cal_directory, etcdhost=self.etcdhost)
+            try:
+                self.bfc[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts,
+                                                                                nserver=len(self.xhosts),
+                                                                                npipeline_per_server=self.npipeline,
+                                                                                cal_directory=cal_directory,
+                                                                                etcdhost=self.etcdhost)
+            except KeyError:
+                logger.error("KeyError when creating beamformer control. Are data being sent from f to x-engines?")
+
             # overload dest set by default
             if self.conf['xengines']['x_dest_beam_port'] is not None:
                 addr = self.conf['xengines']['x_dest_beam_ip']
