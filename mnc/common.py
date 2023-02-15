@@ -6,6 +6,7 @@ import logging
 import threading
 import subprocess
 from datetime import datetime, timedelta
+import logging
 from logging.handlers import TimedRotatingFileHandler
 
 from astropy.time import Time as AstroTime
@@ -306,3 +307,13 @@ def synchronize_time(server='ntp.ubuntu.com'):
     except (OSError, subprocess.CalledProcessError):
         pass
     return sucess
+
+def get_logger(name: str) -> logging.Logger:
+    """
+    Set up the root logger with StreamHandler if one does not exist (e.g. calling from
+    IPython.
+    """
+    logging.basicConfig(
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            level=logging.INFO)
+    return logging.getLogger(name)

@@ -2,23 +2,21 @@ import yaml
 import logging
 import glob
 import numpy as np
-import matplotlib
 import glob
 from dsautils import dsa_store
-
 from lwautils import lwa_arx   # arx
 
-matplotlib.use('Agg')
-
+from mnc.common import get_logger
+logger = get_logger(__name__)
 
 try:
     from lwa_f import snap2_fengine, helpers, snap2_feng_etcd_client  # fengine
 except ImportError:
-    print('No f-eng library found. Skipping.')
+    logger.warning('No f-eng library found. Skipping.')
 try:
     from lwa352_pipeline_control import Lwa352CorrelatorControl  # xengine
 except ImportError:
-    print('No x-eng library found. Skipping.')
+    logger.warning('No x-eng library found. Skipping.')
 
 from mnc import mcs, xengine_beamformer_control
 
@@ -30,14 +28,7 @@ class Controller():
     """
 
     def __init__(self, config_file='config/lwa_config.yaml', etcdhost=None, xhosts=None, npipeline=None):
-        try:
-            self.logger = helpers.add_default_log_handlers(logging.getLogger(f"{__name__}:{host}"))
-        except:
-            logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
-
-        self.logger = logging.getLogger(__name__)
         self.config_file = config_file
-
         conf = self.parse_config(config_file)
 
         self.conf = conf
@@ -55,9 +46,9 @@ class Controller():
         for b in range(1, 11):
             if f"dr{b}" in self.conf['dr']['recorders']:
                 modes.append(f"beam{b}")
-        print(f"Loaded configuration for {self.nhosts} x-engine host(s) running {self.npipeline} pipeline(s) each")
-        print(f"Supported recorder modes are: {','.join(modes)}")
-        print(f"etcd server being used is: {self.etcdhost}")
+        logger.info(f"Loaded configuration for {self.nhosts} x-engine host(s) running {self.npipeline} pipeline(s) each")
+        logger.info(f"Supported recorder modes are: {','.join(modes)}")
+        logger.info(f"etcd server being used is: {self.etcdhost}")
 
     @staticmethod
     def parse_config(config_file):
@@ -105,8 +96,7 @@ class Controller():
         self.x_dest_beam_port = self.conf["xengines"]["x_dest_beam_port"]
 
         # one p object controls all products on given subband
-        p = Lwa352CorrelatorControl(self.xhosts, npipeline_per_host=self.npipeline, etcdhost=self.etcdhost)
-        p.log.setLevel(logging.INFO)
+        p = Lwa352CorrelatorControl(self.xhosts, npipeline_per_host=self.npipeline, etcdhost=self.etcdhost, log=logger.getChild('Lwa352CorrelatorControl'))
         self.pcontroller = p
         self.pipelines = p.pipelines
 
@@ -154,18 +144,17 @@ class Controller():
             f = snap2_fengine.Snap2Fengine(snap2name)
 
             if program and f.fpga.is_programmed():
-                print(f'{snap2name} is already programmed.')
+                logger.info(f'{snap2name} is already programmed.')
 
             if f.is_connected() and not force:
-                print(f'{snap2name} is already connected.')
+                logger.info(f'{snap2name} is already connected.')
                 continue
             else:
-                print(f'Starting f-engine on {snap2name}')
-                self.logger.info(f'Starting f-engine on {snap2name}')
+                logger.info(f'Starting f-engine on {snap2name}')
 
                 localconf = fconf.get(snap2name, None)
                 if localconf is None:
-                    self.logger.error(f"No configuration for F-engine host {snap2name}")
+                    logger.error(f"No configuration for F-engine host {snap2name}")
                     raise RuntimeError(f"No config found for F-engine host {snap2name}")
                 
                 first_stand_index = localconf['ants'][0]
@@ -228,22 +217,21 @@ class Controller():
 
         self.pcontroller.stop_pipelines()   # stop before starting
         self.pcontroller.start_pipelines() 
-        print(f'pipelines up? {self.pcontroller.pipelines_are_up()}')
-        self.logger.info(f'pipelines up? {self.pcontroller.pipelines_are_up()}')
+        logger.info(f'pipelines up? {self.pcontroller.pipelines_are_up()}')
 
         # slow
         if 'drvs' in recorders:
-            print("Configuring x-engine for slow visibilities")
+            logger.info("Configuring x-engine for slow visibilities")
             self.pcontroller.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_slow_port)  # iterates over all slow corr outputs
         else:
-            print("Not configuring x-engine for slow visibilities")            
+            logger.info("Not configuring x-engine for slow visibilities")            
 
         if 'drvf' in recorders:
-            print("Configuring x-engine for fast visibilities")
+            logger.info("Configuring x-engine for fast visibilities")
             for i in range(self.npipeline*self.nhosts):
                 self.pcontroller.pipelines[i].corr_output_part.set_destination(self.x_dest_corr_ip[i], self.x_dest_corr_fast_port[i%4])
         else:
-            print("Not configuring x-engine for fast visibilities")            
+            logger.info("Not configuring x-engine for fast visibilities")            
 
         if calibratebeams:
             cal_directory = self.conf['xengines']['cal_directory']
@@ -256,7 +244,7 @@ class Controller():
                 continue
 
             num = int(recorder[2:])
-            print(f"Configuring x-engine for beam {num}")
+            logger.info(f"Configuring x-engine for beam {num}")
             self.bfc[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
                                                                             npipeline_per_server=self.npipeline,
                                                                             cal_directory=cal_directory, etcdhost=self.etcdhost)
@@ -287,7 +275,7 @@ class Controller():
             elif coordtype == 'celestial':
                 ra, dec = coord
         elif targetname is None:
-            print("Coordinates not fully specified. Pointing at zenith.")
+            logger.info("Coordinates not fully specified. Pointing at zenith.")
             az = 0
             el = 90
 
@@ -299,7 +287,7 @@ class Controller():
             self.bfc[num].set_beam_pointing(az, el)
 
         if self.bfc[num].cal_set is False:
-            print(f'beam {num} calibration not set')
+            logger.info(f'beam {num} calibration not set')
 
         # track
         if track and num in self.bfc:
@@ -309,11 +297,11 @@ class Controller():
             elif ra is not None:
                 t.track(ra, dec=dec)
             else:
-                print('Not tracking for azel input')
+                logging.info('Not tracking for azel input')
         elif num not in self.bfc:
-            print(f'xengine not configured for beam {num}')
+            logging.info(f'xengine not configured for beam {num}')
         else:
-            print('Not tracking')
+            logging.info('Not tracking')
 
     def status_xengine(self):
         """ to be implemented for more detailed monitor point info
@@ -343,7 +331,7 @@ class Controller():
             recorders = [recorders,]
 
         # start ms writing
-        print(f"Starting recorders: {recorders}")
+        logger.info(f"Starting recorders: {recorders}")
         for recorder in recorders:
             accepted = False
 
@@ -351,7 +339,7 @@ class Controller():
             try:
                 num = int(recorder[2:], 10)
                 if num not in self.bfc:
-                    print(f"Warning: you should run start_xengine_bf with 'num={num}' before running beamforming data recorders. Proceeding...")
+                    logger.warn(f"you should run start_xengine_bf with 'num={num}' before running beamforming data recorders. Proceeding...")
                 if recorder in [f'dr{n}' for n in range(1,11)]:
                     if duration is not None:
                         assert isinstance(time_avg, int)
@@ -360,7 +348,7 @@ class Controller():
                                                                    start_mpm='now', duration_ms=duration,
                                                                    time_avg=time_avg)
                     else:
-                        print("Power beam recordings require a duration")
+                        logger.warn("Power beam recordings require a duration")
             except ValueError:
                 pass
 
@@ -369,16 +357,16 @@ class Controller():
                 accepted, response = self.drc.send_command(recorder, 'start', mjd='now', mpm='now')
 
             if not accepted:
-                print(f"WARNING: no response from {recorder}")
+                logger.warn(f"no response from {recorder}")
             elif response['status'] == 'success':
                 rec_extra_info = ''
                 try:
                     rec_extra_info = f" for {duration/1000.0:.3f} s and {time_avg} ms averaging to file {response['response']['filename']}"
                 except (KeyError, TypeError):
                     pass
-                print(f"recording on {recorder}{rec_extra_info}")
+                logger.info(f"recording on {recorder}{rec_extra_info}")
             else:
-                print(f"WARNING: recording on {recorder} failed: {response['response']}")
+                logger.warn(f"recording on {recorder} failed: {response['response']}")
                 
             if self.drc.read_monitor_point('summary', recorder).value != 'normal':
                 self.drc.read_monitor_point('info', recorder)
@@ -421,8 +409,8 @@ class Controller():
                 accepted, response = self.drc.send_command(recorder, 'cancel', queue_number=queue)
 
             if not accepted:
-                print(f"WARNING: no response from {recorder}")
+                logger.warn(f"no response from {recorder}")
             elif response['status'] == 'success':
-                print(f"recording on {recorder} stopped")
+                logger.info(f"recording on {recorder} stopped")
             else:
-                print(f"WARNING: stopping recording on {recorder} failed: {response['response']}")
+                logger.warn(f"stopping recording on {recorder} failed: {response['response']}")
