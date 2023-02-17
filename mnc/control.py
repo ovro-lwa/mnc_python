@@ -119,11 +119,12 @@ class Controller():
         for adr in aconf['adrs']:
             ma.load_cfg(adr, preset)
 
-    def start_fengine(self, initialize=False, program=False, force=False):
+    def start_fengine(self, initialize=False, program=False, force=False, useetcd=True):
         """ Start the fengines on all snap2s.
         Defaults to all listed in "snap2s_inuse" field of configuration file.
         Optionally can initialize and program.
         force will run cold_start method regardless of current state.
+        useetcd will route f-engine commands through etcd interface instead of directly.
         """
 
         fconf = self.conf['fengines']
@@ -141,7 +142,10 @@ class Controller():
             dests += [{'ip':dest_ip, 'port':dest_port, 'start_chan':start_chan, 'nchan':nchan}]
 
         for snap2name in snap2names:
-            f = snap2_fengine.Snap2FengineEtcd(snap2name, etcdhost=self.etcdhost)
+            if useetcd:
+                f = snap2_fengine.Snap2FengineEtcd(snap2name, etcdhost=self.etcdhost)
+            else:
+                f = snap2_fengine.Snap2Fengine(snap2name)
 
             if program and f.fpga.is_programmed():
                 logger.info(f'{snap2name} is already programmed.')
