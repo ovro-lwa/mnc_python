@@ -5,6 +5,7 @@ import numpy as np
 import glob
 from dsautils import dsa_store
 from lwautils import lwa_arx   # arx
+import time
 
 from mnc.common import get_logger
 logger = get_logger(__name__)
@@ -306,9 +307,13 @@ class Controller():
     def status_xengine(self):
         """ to be implemented for more detailed monitor point info
         """
-        print("Pipeline id: connection, up")
+        AGE_THRESHOLD_S = 10
+        print("Pipeline id: alive capture_gbps corr_gbps")
         for pipeline in self.pipelines:
-            print(f'{pipeline.pipeline_id}: {pipeline.check_connection()}, {pipeline.pipeline_is_up()}')
+            capture_status = pipeline.capture.get_bifrost_status()
+            corr_status = pipeline.corr.get_bifrost_status()
+            alive = (time.time() - corr_status['time'] < AGE_THRESHOLD_S)
+            print(f"{pipeline.host}:{pipeline.pipeline_id}:\t{alive}\t{capture_status['gbps']:.1f}\t{corr_status['gbps']:.1f}")
 
     def stop_xengine(self):
         """ Stop xengines listed in configuration file.
