@@ -141,7 +141,7 @@ class Controller():
             dests += [{'ip':dest_ip, 'port':dest_port, 'start_chan':start_chan, 'nchan':nchan}]
 
         for snap2name in snap2names:
-            f = snap2_fengine.Snap2FengineEtcd(snap2name)
+            f = snap2_fengine.Snap2FengineEtcd(snap2name, etcdhost=self.etcdhost)
 
             if program and f.fpga.is_programmed():
                 logger.info(f'{snap2name} is already programmed.')
