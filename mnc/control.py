@@ -119,11 +119,12 @@ class Controller():
         for adr in aconf['adrs']:
             ma.load_cfg(adr, preset)
 
-    def start_fengine(self, initialize=False, program=False, force=False):
+    def start_fengine(self, initialize=False, program=False, force=False, useetcd=True):
         """ Start the fengines on all snap2s.
         Defaults to all listed in "snap2s_inuse" field of configuration file.
         Optionally can initialize and program.
         force will run cold_start method regardless of current state.
+        useetcd will route f-engine commands through etcd interface instead of directly.
         """
 
         fconf = self.conf['fengines']
@@ -141,7 +142,10 @@ class Controller():
             dests += [{'ip':dest_ip, 'port':dest_port, 'start_chan':start_chan, 'nchan':nchan}]
 
         for snap2name in snap2names:
-            f = snap2_fengine.Snap2Fengine(snap2name)
+            if useetcd:
+                f = snap2_fengine.Snap2FengineEtcd(snap2name, etcdhost=self.etcdhost)
+            else:
+                f = snap2_fengine.Snap2Fengine(snap2name)
 
             if program and f.fpga.is_programmed():
                 logger.info(f'{snap2name} is already programmed.')
@@ -171,9 +175,8 @@ class Controller():
                 
                 f.print_status_all()
 
-    def status_fengine(self, poll=False):
+    def status_fengine(self):
         """ Use snap2 etcd client to poll for stats on each fengine.
-        poll of True will refresh the fengine statistics.
         """
 
         snap2names = self.conf['fengines']['snap2s_inuse']
@@ -181,11 +184,7 @@ class Controller():
         ls = dsa_store.DsaStore()
 
         for snap2name in snap2names:
-            snap2num = int(snap2name.lstrip('snap'))
-
-            if poll:
-                lwa_fe = snap2_feng_etcd_client.Snap2FengineEtcdClient(snap2name, int(snap2name.lstrip('snap')))
-                lwa_fe.poll_stats()
+            snap2num = snap2name.lstrip('snap')
 
             dd = ls.get_dict(f'/mon/snap/{snap2num}')
 
@@ -222,7 +221,11 @@ class Controller():
         # slow
         if 'drvs' in recorders:
             logger.info("Configuring x-engine for slow visibilities")
-            self.pcontroller.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_slow_port)  # iterates over all slow corr outputs
+            try:
+                self.pcontroller.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_slow_port)  # iterates over all slow corr outputs
+            except KeyError:
+                logger.error("KeyError when configuring correlator. Are data being sent from f to x-engines?")
+
         else:
             logger.info("Not configuring x-engine for slow visibilities")            
 
@@ -245,9 +248,15 @@ class Controller():
 
             num = int(recorder[2:])
             logger.info(f"Configuring x-engine for beam {num}")
-            self.bfc[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts, nserver=len(self.xhosts),
-                                                                            npipeline_per_server=self.npipeline,
-                                                                            cal_directory=cal_directory, etcdhost=self.etcdhost)
+            try:
+                self.bfc[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts,
+                                                                                nserver=len(self.xhosts),
+                                                                                npipeline_per_server=self.npipeline,
+                                                                                cal_directory=cal_directory,
+                                                                                etcdhost=self.etcdhost)
+            except KeyError:
+                logger.error("KeyError when creating beamformer control. Are data being sent from f to x-engines?")
+
             # overload dest set by default
             if self.conf['xengines']['x_dest_beam_port'] is not None:
                 addr = self.conf['xengines']['x_dest_beam_ip']
