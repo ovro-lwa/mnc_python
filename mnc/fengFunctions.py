@@ -37,7 +37,7 @@ def myfengines():
         id='snap'+'%02d'%(snaps[i])
         print("###SNAP2:",id)
         try:
-            f.append(snap2_fengine.Snap2Fengine(id))
+            f.append(snap2_fengine.Snap2FengineEtcd(id))
         except:
             continue
 
