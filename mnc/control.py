@@ -171,9 +171,8 @@ class Controller():
                 
                 f.print_status_all()
 
-    def status_fengine(self, poll=False):
+    def status_fengine(self):
         """ Use snap2 etcd client to poll for stats on each fengine.
-        poll of True will refresh the fengine statistics.
         """
 
         snap2names = self.conf['fengines']['snap2s_inuse']
@@ -182,10 +181,6 @@ class Controller():
 
         for snap2name in snap2names:
             snap2num = int(snap2name.lstrip('snap'))
-
-            if poll:
-                lwa_fe = snap2_feng_etcd_client.Snap2FengineEtcdClient(snap2name, int(snap2name.lstrip('snap')))
-                lwa_fe.poll_stats()
 
             dd = ls.get_dict(f'/mon/snap/{snap2num}')
 
