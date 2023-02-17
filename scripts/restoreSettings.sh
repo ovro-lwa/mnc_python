@@ -7,7 +7,7 @@ if [ -n "$1" ]
 then
     filename=$1
 else    
-    filename="data/20230105b-settingsAll.mat"
+    filename="data/20230217-settingsAll.mat"
 fi
 
 echo 'Restoring ARX and F-Engine settings with' $filename
