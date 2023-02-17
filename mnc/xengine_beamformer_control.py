@@ -3,12 +3,12 @@ import glob
 import json
 import time
 import numpy
-import warnings
 import ipaddress
 import progressbar
 from threading import RLock
 from textwrap import fill as tw_fill
 from concurrent.futures import ThreadPoolExecutor, wait as thread_pool_wait
+import asyncio
 
 from lwa352_pipeline_control import Lwa352PipelineControl
 from casacore import tables
@@ -22,8 +22,9 @@ speedOfLight = speedOfLight.to('m/ns').value
 
 from lwa_antpos.station import ovro
 
-from mnc.common import NPIPELINE, chan_to_freq, ETCD_HOST
+from mnc.common import NPIPELINE, chan_to_freq, ETCD_HOST, get_logger
 
+logger = get_logger(__name__)
 
 NCHAN_PIPELINE = 96
 NPIPELINE_SUBBAND = 2
@@ -60,7 +61,7 @@ class AllowedPipelineFailure(object):
         
     def __exit__(self, exc_type, exc_value, exc_traceback):
         if exc_type:
-            warnings.warn(f"Failed to command {self.pipeline.host} (pipeline {self.pipeline.pipeline_id})")
+            logger.warn(f"Failed to command {self.pipeline.host} (pipeline {self.pipeline.pipeline_id})")
         return True
 
 
@@ -124,7 +125,7 @@ class BeamPointingControl(object):
         self.pipelines = []
         for hostname in servers:
             for i in range(npipeline_per_server):
-                p = Lwa352PipelineControl(hostname, i, etcdhost=etcdhost)
+                p = Lwa352PipelineControl(hostname, i, etcdhost=etcdhost, log=logger.getChild('Lwa352PipelineControl'))
                 self.pipelines.append(p)
                 
         # Query the pipelines to figure out the frequency ranges they are sending
@@ -277,11 +278,16 @@ class BeamPointingControl(object):
         # Issue a warning if we don't seem to have the right number of pipelines
         # for the subband
         if len(subband_pipelines) != NPIPELINE_SUBBAND:
-            warnings.warn(f"Found {len(subband_pipelines)} pipelines associated with these data instead of the expected {NPIPELINE_SUBBAND}")
+            logger.warning(f"Found {len(subband_pipelines)} pipelines associated with these data instead of the expected {NPIPELINE_SUBBAND}")
             
         # Set the coefficients - this is slow
-        pb = progressbar.ProgressBar(redirect_stdout=True)
-        pb.start(max_value=len(subband_pipelines)*NSTAND)
+        async def push_gains(pp, ii, beam_id, input_id, g):
+            with AllowedPipelineFailure(pp):
+                pp.beamform.update_calibration_gains(beam_id, input_id, g)
+            self._cal_set[ii] = True
+
+        loop = asyncio.new_event_loop()
+        to_execute = []
         for i,(p,ii) in enumerate(zip(subband_pipelines, subband_pipeline_index)):
             for j in range(NSTAND):
                 for pol in range(NPOL):
@@ -289,14 +295,10 @@ class BeamPointingControl(object):
                     cal = numpy.where(numpy.isfinite(cal), cal, 0)
                     flg = flgdata[j,i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol].ravel()
                     cal *= (1-flg)
-                    
-                    with AllowedPipelineFailure(p):
-                        p.beamform.update_calibration_gains(2*(self.beam-1)+pol, NPOL*j+pol, cal)
-                        time.sleep(0.005)
-                pb += 1
-            self._cal_set[ii] = True
-        pb.finish()
-        
+                    to_execute.append(push_gains(p, ii, 2*(self.beam-1)+pol, NPOL*j+pol, cal))
+        loop.run_until_complete(asyncio.gather(*to_execute, loop=loop))
+        loop.close()
+    
     def set_beam_gain(self, gain):
         """
         Set the "gain" for beam 1 - this is a multiplicative scalar used during
@@ -348,7 +350,7 @@ class BeamPointingControl(object):
         
         # Issue a warning if it doesn't look like we've been calibrated
         if not self.cal_set:
-            warnings.warn("Calibration is not set, your results may be suspect")
+            logger.warn("Calibration is not set, your results may be suspect")
             
         # Convertion from degrees -> radians, plus a validation
         if degrees:
@@ -553,7 +555,7 @@ def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4, 
     calfiles = glob.glob(os.path.join(cal_directory, '*.bcal'))
     calfiles.sort()
     if len(calfiles) == 0:
-        warnings.warn(f"No calibration data found in '{cal_directory}'")
+        logger.warn(f"No calibration data found in '{cal_directory}'")
         
     # Load the calibration data, if found
     for calfile in calfiles:
