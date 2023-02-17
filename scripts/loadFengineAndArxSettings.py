@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Script to configure F engines and ARX boards
 # USAGE:  $python loadFengineAndArxSettings.py <eqFile.mat>
 
@@ -6,6 +7,8 @@
 # 20230203 Include ARX setting.
 # 20230211 Include delay setting.
 # 20230211 Use etcd interface for F engine settings.
+# 20230217 Add optional setting of unused dsig feng inputs to zero.
+# 20230217 Make output less verbose.
 
 import sys
 import scipy.io as mat
@@ -22,28 +25,37 @@ ETCDHOST = 'etcdv3service.sas.pvt'
 config = mat.loadmat(sys.argv[1],squeeze_me=True)
 print('Read data file',sys.argv[1])
 print('Data file internal time: ',time.asctime(time.gmtime(config['time'])))
+cfgkeys = config.keys()
+
+# Establish interface to F engines on SNAP2 boards
+#import myfengines as f
+
+from mnc.fengFunctions import dsig2feng
+from lwa_f import snap2_feng_etcd_client
+ec = snap2_feng_etcd_client.Snap2FengineEtcdControl(ETCDHOST)
+print('Connected to ETCD host %s' % ETCDHOST)
+
+#=================================
+# SET F ENGINE FFT SHIFT SCHEDULE
+#---------------------------------
+
+if 'fftshift' in cfgkeys:
+    fftshift = config['fftshift']
+else:
+    fftshift = 0x1FFC
+for i in range(11):
+    #f.f[i].pfb.set_fft_shift(0x1FFF)  # Request shift at all FFT stages
+    ec.send_command(i+1,'pfb','set_fft_shift',kwargs={'shift':int(fftshift)})
+print('All FFT shifts set to','%04X' % fftshift)
 
 
 #=====================================
 # LOAD F ENGINE EQUALIZATION FUNCTIONS
 #-------------------------------------
 
-#import myfengines as f
-from mnc.fengFunctions import dsig2feng
-from lwa_f import snap2_feng_etcd_client
-ec = snap2_feng_etcd_client.Snap2FengineEtcdControl(ETCDHOST)
-
-print('Connected to ETCD host %s' % ETCDHOST)
-cfgkeys = config.keys()
-
-# Set FFT shift to maximum for all boards      
-for i in range(11):
-    #f.f[i].pfb.set_fft_shift(0x1FFF)  # Request shift at all FFT stages
-    ec.send_command(i+1,'pfb','set_fft_shift',kwargs={'shift':0x1FFF})
-    print('snap%02d:'%(i+1)," fft shift set")
-
 coef = config['coef']   # must include this key
 dsigDone = []
+print('LOADING EQUALIZATION COEFFICIENTS')
 
 k = 'eq0'   # coax length = ref+-50m
 if k in cfgkeys:
@@ -53,7 +65,7 @@ if k in cfgkeys:
         #f.f[loc[0]-1].eq.set_coeffs(int(loc[1]),coef[0])
         ec.send_command(loc[0],'eq','set_coeffs',kwargs={'stream':int(int(loc[1])),'coeffs':coef[0].tolist()})
         dsigDone.append(i)
-    print(dsig)
+    print('eq0:',dsig)
 
 k = 'eq1'   # coax: shortest
 if k in cfgkeys:
@@ -63,7 +75,7 @@ if k in cfgkeys:
         #f.f[loc[0]-1].eq.set_coeffs(int(loc[1]),coef[1])
         ec.send_command(loc[0],'eq','set_coeffs',kwargs={'stream':int(loc[1]),'coeffs':coef[1].tolist()})
         dsigDone.append(i)
-    print(dsig)
+    print('eq1:',dsig)
 
 k = 'eq2'   # coax: next 40m
 if k in cfgkeys:
@@ -73,7 +85,7 @@ if k in cfgkeys:
         #f.f[loc[0]-1].eq.set_coeffs(int(loc[1]),coef[2])
         ec.send_command(loc[0],'eq','set_coeffs',kwargs={'stream':int(loc[1]),'coeffs':coef[2].tolist()})
         dsigDone.append(i)
-    print(dsig)
+    print('eq2:',dsig)
 
 k = 'eq3'   # coax: next 40m
 if k in cfgkeys:
@@ -83,7 +95,7 @@ if k in cfgkeys:
         #f.f[loc[0]-1].eq.set_coeffs(int(loc[1]),coef[3])
         ec.send_command(loc[0],'eq','set_coeffs',kwargs={'stream':int(loc[1]),'coeffs':coef[3].tolist()})
         dsigDone.append(i)
-    print(dsig)
+    print('eq3:',dsig)
 
 k = 'eq4'   # coax: next 40m
 if k in cfgkeys:
@@ -93,7 +105,7 @@ if k in cfgkeys:
         #f.f[loc[0]-1].eq.set_coeffs(int(loc[1]),coef[4])
         ec.send_command(loc[0],'eq','set_coeffs',kwargs={'stream':int(loc[1]),'coeffs':coef[4].tolist()})
         dsigDone.append(i)
-    print(dsig)
+    print('eq4:',dsig)
 
 k = 'eq5'   # coax: longest
 if k in cfgkeys:
@@ -103,7 +115,7 @@ if k in cfgkeys:
         #f.f[loc[0]-1].eq.set_coeffs(int(loc[1]),coef[5])
         ec.send_command(loc[0],'eq','set_coeffs',kwargs={'stream':int(loc[1]),'coeffs':coef[5].tolist()})
         dsigDone.append(i)
-    print(dsig)
+    print('eq5:',dsig)
 
 k = 'eq6'   # fiber
 if k in cfgkeys:
@@ -113,7 +125,7 @@ if k in cfgkeys:
         #f.f[loc[0]-1].eq.set_coeffs(int(loc[1]),coef[6])
         ec.send_command(loc[0],'eq','set_coeffs',kwargs={'stream':int(loc[1]),'coeffs':coef[6].tolist()})
         dsigDone.append(i)
-    print(dsig)
+    print('eq6:',dsig)
 
 # All others (if any): set same as reference
 for i in range(704):  # all others
@@ -138,8 +150,9 @@ if 'delay_dsig' in config.keys():
     max_relative_delay_clocks = delays_clocks.max()
 
     delays_to_apply_clocks = relative_delays_clocks + DELAY_OFFSET
-    print(delays_to_apply_clocks)
-    
+    #print(delays_to_apply_clocks)
+
+    print('LOADING DELAYS')
     print('Maximum delay: %f ns' % max_delay_ns)
     print('Maximum delay: %d ADC clocks' % max_delay_clocks)
     print('Maximum relative delay: %d ADC clocks' % max_relative_delay_clocks)
@@ -150,11 +163,25 @@ if 'delay_dsig' in config.keys():
         sig = dsig2feng(dsig)
         snap_id = sig[0]
         input_id = sig[1]
-        print(dsig,snap_id,input_id,delays_to_apply_clocks[dsig])
+        #print('Loading delays:',dsig,snap_id,input_id)
         ec.send_command(snap_id, 'delay', 'set_delay', kwargs={'stream':input_id, 'delay':int(delays_to_apply_clocks[dsig])})
         #f.f[snap_id-1].delay.set_delay(input_id,int(delays_to_apply_clocks[dsig]))
 
+#============================
+# SET UNUSED F INPUTS TO ZERO
+#----------------------------
+
+if 'unused' in cfgkeys:
+    print('SETTING UNUSED F ENG INPUTS TO ZERO.')
+    unused = config['unused']
+    for i in range(704):
+        if unused[i]==True:
+            sig = dsig2feng(i)
+            snap_id = sig[0]
+            input_id = sig[1]
+            ec.send_command(snap_id, 'input', 'use_zero', kwargs={'stream':input_id})
     
+
 #======================
 # NOW LOAD ARX SETTINGS
 #----------------------
@@ -163,7 +190,8 @@ import mnc.myarx as a
 
 adrs = config['adrs']
 settings = config['settings']
-print('ARX: ',adrs)
+print('LOADING ARX SETTINGS')
+print('addresses: ',adrs)
 
 for i in range(len(adrs)):
     codes = ''
@@ -173,7 +201,7 @@ for i in range(len(adrs)):
     try:
         a.raw(adrs[i],'SETA'+codes)
         print('Loaded: ',adrs[i],codes)
-        print(settings[i])
+        #print(settings[i])
     except:
         continue
 
