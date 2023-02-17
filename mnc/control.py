@@ -180,7 +180,7 @@ class Controller():
         ls = dsa_store.DsaStore()
 
         for snap2name in snap2names:
-            snap2num = int(snap2name.lstrip('snap'))
+            snap2num = snap2name.lstrip('snap')
 
             dd = ls.get_dict(f'/mon/snap/{snap2num}')
 
