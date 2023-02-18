@@ -198,7 +198,7 @@ class Controller():
         return timestamp, stats
 
     def configure_xengine(self, recorders=None, calibratebeams=False):
-        """ Start xengines listed in configuration file.
+        """ Restart xengine. Configure pipelines to send data to recorders.
         Recorders is list of recorders to configure output to. Defaults to those in config file.
         Supported recorders are "drvs" (slow vis), "drvf" (fast vis), "dr[n]" (power beams)
         """
@@ -209,14 +209,15 @@ class Controller():
         elif not isinstance(recorders, (list, tuple)):
             recorders = [recorders,]
 
-        # Clear the beamformer state
-        self.bfc.clear()
         
         xconf = self.conf['xengines']
 
         self.pcontroller.stop_pipelines()   # stop before starting
         self.pcontroller.start_pipelines() 
         logger.info(f'pipelines up? {self.pcontroller.pipelines_are_up()}')
+
+        # Clear the beamformer state
+        self.bfc.clear()
 
         # slow
         if 'drvs' in recorders:
@@ -257,6 +258,7 @@ class Controller():
             except KeyError:
                 logger.error("KeyError when creating beamformer control. Are data being sent from f to x-engines?")
 
+            logger.info(f"Done setting calibration gains for beam {num}")
             # overload dest set by default
             if self.conf['xengines']['x_dest_beam_port'] is not None:
                 addr = self.conf['xengines']['x_dest_beam_ip']
@@ -284,9 +286,14 @@ class Controller():
             elif coordtype == 'celestial':
                 ra, dec = coord
         elif targetname is None:
-            logger.info("Coordinates not fully specified. Pointing at zenith.")
+            logger.warning("Coordinates not fully specified. Pointing at zenith.")
             az = 0
             el = 90
+
+        if num not in self.blc:
+            msg = "Xengine not configured for beam {num}"
+            logger.error(msg)
+            raise KeyError(msg)
 
         if targetname is not None:
             self.bfc[num].set_beam_target(targetname)
@@ -299,18 +306,16 @@ class Controller():
             logger.info(f'beam {num} calibration not set')
 
         # track
-        if track and num in self.bfc:
+        if track:
             t = xengine_beamformer_control.BeamTracker(self.bfc[num], update_interval=self.conf['xengines']['update_interval'])
             if targetname is not None:
                 t.track(targetname)
             elif ra is not None:
                 t.track(ra, dec=dec)
             else:
-                logging.info('Not tracking for azel input')
-        elif num not in self.bfc:
-            logging.info(f'xengine not configured for beam {num}')
+                logging.info(f'Beam {num}: Not tracking for azel input')
         else:
-            logging.info('Not tracking')
+            logging.info(f'Beam {num}: Not tracking')
 
     def status_xengine(self):
         """ to be implemented for more detailed monitor point info
