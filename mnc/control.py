@@ -317,7 +317,7 @@ class Controller():
                 raise RuntimeError("Failed to get X engine capture block status.")
             alive = (time.time() - corr_status['time'] < AGE_THRESHOLD_S)
             print(fmt.format(f'{pipeline.host}:{pipeline.pipeline_id}',
-                             alive,
+                             str(bool(alive)),
                              f"{capture_status['gbps']:1.f}",
                              f"{corr_status['gbps']:1.f}"))
 
