@@ -305,15 +305,21 @@ class Controller():
             logging.info('Not tracking')
 
     def status_xengine(self):
-        """ to be implemented for more detailed monitor point info
+        """ print x engine status
         """
         AGE_THRESHOLD_S = 10
-        print("Pipeline id: alive capture_gbps corr_gbps")
+        fmt = '{<16}{<8}{<14}{<14}'
+        print(fmt.format("Pipeline id:", "alive", "capture_gbps", "corr_gbps"))
         for pipeline in self.pipelines:
             capture_status = pipeline.capture.get_bifrost_status()
             corr_status = pipeline.corr.get_bifrost_status()
+            if capture_status is None:
+                raise RuntimeError("Failed to get X engine capture block status.")
             alive = (time.time() - corr_status['time'] < AGE_THRESHOLD_S)
-            print(f"{pipeline.host}:{pipeline.pipeline_id}:\t{alive}\t{capture_status['gbps']:.1f}\t{corr_status['gbps']:.1f}")
+            print(fmt.format('pipeline.host:{pipeline.pipeline_id}',
+                             alive,
+                             f"{capture_status['gbps']:1.f}",
+                             f"{corr_status['gbps']:.1f}"))
 
     def stop_xengine(self):
         """ Stop xengines listed in configuration file.
