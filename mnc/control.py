@@ -318,8 +318,8 @@ class Controller():
             alive = (time.time() - corr_status['time'] < AGE_THRESHOLD_S)
             print(fmt.format(f'{pipeline.host}:{pipeline.pipeline_id}',
                              str(bool(alive)),
-                             f"{capture_status['gbps']:1.f}",
-                             f"{corr_status['gbps']:1.f}"))
+                             f"{capture_status['gbps']:.1f}",
+                             f"{corr_status['gbps']:.1f}"))
 
     def stop_xengine(self):
         """ Stop xengines listed in configuration file.
