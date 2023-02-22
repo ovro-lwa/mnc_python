@@ -308,7 +308,7 @@ class Controller():
         """ print x engine status
         """
         AGE_THRESHOLD_S = 10
-        fmt = '{<16}{<8}{<14}{<14}'
+        fmt = '{:<16}{:<8}{:<14}{:<14}'
         print(fmt.format("Pipeline id:", "alive", "capture_gbps", "corr_gbps"))
         for pipeline in self.pipelines:
             capture_status = pipeline.capture.get_bifrost_status()
@@ -316,10 +316,10 @@ class Controller():
             if capture_status is None:
                 raise RuntimeError("Failed to get X engine capture block status.")
             alive = (time.time() - corr_status['time'] < AGE_THRESHOLD_S)
-            print(fmt.format('pipeline.host:{pipeline.pipeline_id}',
+            print(fmt.format(f'{pipeline.host}:{pipeline.pipeline_id}',
                              alive,
                              f"{capture_status['gbps']:1.f}",
-                             f"{corr_status['gbps']:.1f}"))
+                             f"{corr_status['gbps']:1.f}"))
 
     def stop_xengine(self):
         """ Stop xengines listed in configuration file.
