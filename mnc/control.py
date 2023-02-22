@@ -5,6 +5,7 @@ import numpy as np
 import glob
 from dsautils import dsa_store
 from lwautils import lwa_arx   # arx
+import time
 
 from mnc.common import get_logger
 logger = get_logger(__name__)
@@ -186,7 +187,10 @@ class Controller():
         for snap2name in snap2names:
             snap2num = snap2name.lstrip('snap')
 
-            dd = ls.get_dict(f'/mon/snap/{snap2num}')
+            try:
+                dd = ls.get_dict(f'/mon/snap/{snap2num}')
+            except Exception as e:
+                raise e
 
             if dd is not None:
                 stats[snap2name] = dd['stats']
@@ -318,11 +322,21 @@ class Controller():
             logging.info(f'Beam {num}: Not tracking')
 
     def status_xengine(self):
-        """ to be implemented for more detailed monitor point info
+        """ print x engine status
         """
-        print("Pipeline id: connection, up")
+        AGE_THRESHOLD_S = 10
+        fmt = '{:<16}{:<8}{:<14}{:<14}'
+        print(fmt.format("Pipeline id:", "alive", "capture_gbps", "corr_gbps"))
         for pipeline in self.pipelines:
-            print(f'{pipeline.pipeline_id}: {pipeline.check_connection()}, {pipeline.pipeline_is_up()}')
+            capture_status = pipeline.capture.get_bifrost_status()
+            corr_status = pipeline.corr.get_bifrost_status()
+            if capture_status is None:
+                raise RuntimeError("Failed to get X engine capture block status.")
+            alive = (time.time() - corr_status['time'] < AGE_THRESHOLD_S)
+            print(fmt.format(f'{pipeline.host}:{pipeline.pipeline_id}',
+                             str(bool(alive)),
+                             f"{capture_status['gbps']:.1f}",
+                             f"{corr_status['gbps']:.1f}"))
 
     def stop_xengine(self):
         """ Stop xengines listed in configuration file.
