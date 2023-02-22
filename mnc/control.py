@@ -187,7 +187,10 @@ class Controller():
         for snap2name in snap2names:
             snap2num = snap2name.lstrip('snap')
 
-            dd = ls.get_dict(f'/mon/snap/{snap2num}')
+            try:
+                dd = ls.get_dict(f'/mon/snap/{snap2num}')
+            except Exception as e:
+                raise e
 
             if dd is not None:
                 stats[snap2name] = dd['stats']
