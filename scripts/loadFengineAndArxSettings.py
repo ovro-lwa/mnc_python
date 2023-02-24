@@ -7,8 +7,9 @@
 # 20230203 Include ARX setting.
 # 20230211 Include delay setting.
 # 20230211 Use etcd interface for F engine settings.
-# 20230217 Add optional setting of unused dsig feng inputs to zero.
+# 20230217 Add optional setting of unused dsig feng inputs to use_zero.
 # 20230217 Make output less verbose.
+# 20230218 Set ~unused feng inputs to use_adc().
 
 import sys
 import scipy.io as mat
@@ -29,7 +30,6 @@ cfgkeys = config.keys()
 
 # Establish interface to F engines on SNAP2 boards
 #import myfengines as f
-
 from mnc.fengFunctions import dsig2feng
 from lwa_f import snap2_feng_etcd_client
 ec = snap2_feng_etcd_client.Snap2FengineEtcdControl(ETCDHOST)
@@ -39,10 +39,11 @@ print('Connected to ETCD host %s' % ETCDHOST)
 # SET F ENGINE FFT SHIFT SCHEDULE
 #---------------------------------
 
-if 'fftshift' in cfgkeys:
-    fftshift = config['fftshift']
+if 'fftShift' in cfgkeys:
+    fftshift = config['fftShift']
 else:
     fftshift = 0x1FFC
+
 for i in range(11):
     #f.f[i].pfb.set_fft_shift(0x1FFF)  # Request shift at all FFT stages
     ec.send_command(i+1,'pfb','set_fft_shift',kwargs={'shift':int(fftshift)})
@@ -175,12 +176,15 @@ if 'unused' in cfgkeys:
     print('SETTING UNUSED F ENG INPUTS TO ZERO.')
     unused = config['unused']
     for i in range(704):
+        sig = dsig2feng(i)
+        snap_id = sig[0]
+        input_id = sig[1]
         if unused[i]==True:
-            sig = dsig2feng(i)
-            snap_id = sig[0]
-            input_id = sig[1]
             ec.send_command(snap_id, 'input', 'use_zero', kwargs={'stream':input_id})
-    
+        else:
+            ec.send_command(snap_id, 'input', 'use_adc', kwargs={'stream':input_id})
+    print('Set',sum(unused),'inputs to use_zero and',sum(~unused),'inputs to use_adc.')
+            
 
 #======================
 # NOW LOAD ARX SETTINGS
