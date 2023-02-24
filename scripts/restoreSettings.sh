@@ -7,12 +7,12 @@ if [ -n "$1" ]
 then
     filename=$1
 else    
-    filename="data/20230217-settingsAll.mat"
+    filename="data/20230223-settingsAll-night.mat"
 fi
 
 echo 'Restoring ARX and F-Engine settings with' $filename
 python scripts/loadFengineAndArxSettings.py $filename
 
-# latest version of Larry's script (23Feb13) does delay setting too
+# After 23 Feb13, Larry's script does delay setting too. Alternatively...
 #echo 'Restoring X-Engine settings...'
 #python scripts/lwa_load_delays.py data/cable_delays.csv
