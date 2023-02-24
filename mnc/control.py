@@ -291,7 +291,7 @@ class Controller():
             az = 0
             el = 90
 
-        if num not in self.blc:
+        if num not in self.bfc:
             msg = "Xengine not configured for beam {num}"
             logger.error(msg)
             raise KeyError(msg)
