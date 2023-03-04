@@ -25,7 +25,7 @@ ETCDHOST = 'etcdv3service.sas.pvt'
 # Read configuration data file
 config = mat.loadmat(sys.argv[1],squeeze_me=True)
 print('Read data file',sys.argv[1])
-print('Data file internal time: ',time.asctime(time.gmtime(config['time'])))
+# print('Data file internal time: ',time.asctime(time.gmtime(config['time'])))
 cfgkeys = config.keys()
 
 # Establish interface to F engines on SNAP2 boards
@@ -179,10 +179,7 @@ if 'unused' in cfgkeys:
         sig = dsig2feng(i)
         snap_id = sig[0]
         input_id = sig[1]
-        if unused[i]==True:
-            ec.send_command(snap_id, 'input', 'use_zero', kwargs={'stream':input_id})
-        else:
-            ec.send_command(snap_id, 'input', 'use_adc', kwargs={'stream':input_id})
+        ec.send_command(snap_id, 'input', 'use_adc', kwargs={'stream':input_id})
     print('Set',sum(unused),'inputs to use_zero and',sum(~unused),'inputs to use_adc.')
             
 
