@@ -89,7 +89,7 @@ class Controller():
         # select calim names/ips for selected xhosts
         calim_name = [self.conf["xengines"]["x_dest_corr_name"][gpu_name] for gpu_name in self.xhosts]
         drips = [self.conf["drip_mapping"][name] for name in calim_name]
-        self.x_dest_corr_ip = list([item for item in drips for i in range(self.npipeline)])
+        self.x_dest_corr_ip = [item for item in drips for i in range(self.npipeline)]
         self.x_dest_corr_slow_port = self.conf["xengines"]["x_dest_corr_slow_port"]
         self.x_dest_corr_fast_port = self.conf["xengines"]["x_dest_corr_fast_port"]
         # beamforming
