@@ -201,10 +201,11 @@ class Controller():
 
         return timestamp, stats
 
-    def configure_xengine(self, recorders=None, calibratebeams=False):
+    def configure_xengine(self, recorders=None, calibratebeams=False, full=True):
         """ Restart xengine. Configure pipelines to send data to recorders.
         Recorders is list of recorders to configure output to. Defaults to those in config file.
         Supported recorders are "drvs" (slow vis), "drvf" (fast vis), "dr[n]" (power beams)
+        Option "full" will stop/start/clear pipelines/beamformer controllers.
         """
 
         dconf = self.conf['dr']
@@ -216,12 +217,16 @@ class Controller():
         
         xconf = self.conf['xengines']
 
-        self.pcontroller.stop_pipelines()   # stop before starting
-        self.pcontroller.start_pipelines() 
-        logger.info(f'pipelines up? {self.pcontroller.pipelines_are_up()}')
+        if full:
+            logger.info("Stopping/starting pipelines")
+            # stop before starting
+            self.pcontroller.stop_pipelines()   
+            self.pcontroller.start_pipelines() 
 
-        # Clear the beamformer state
-        self.bfc.clear()
+            # Clear the beamformer state
+            self.bfc.clear()
+
+        logger.info(f'pipelines up? {self.pcontroller.pipelines_are_up()}')
 
         # slow
         if 'drvs' in recorders:
