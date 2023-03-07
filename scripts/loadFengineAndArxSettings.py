@@ -172,17 +172,11 @@ if 'delay_dsig' in config.keys():
 # SET UNUSED F INPUTS TO ZERO
 #----------------------------
 
-if 'unused' in cfgkeys:
-    print('SETTING UNUSED F ENG INPUTS TO ZERO.')
-    unused = config['unused']
-    for i in range(704):
-        sig = dsig2feng(i)
-        snap_id = sig[0]
-        input_id = sig[1]
-        ec.send_command(snap_id, 'input', 'use_adc', kwargs={'stream':input_id})
-    print('Set',sum(unused),'inputs to use_zero and',sum(~unused),'inputs to use_adc.')
-            
-
+for i in range(704):
+    sig = dsig2feng(i)
+    snap_id = sig[0]
+    input_id = sig[1]
+    ec.send_command(snap_id, 'input', 'use_adc', kwargs={'stream':input_id})
 #======================
 # NOW LOAD ARX SETTINGS
 #----------------------
@@ -203,6 +197,7 @@ for i in range(len(adrs)):
         a.raw(adrs[i],'SETA'+codes)
         print('Loaded: ',adrs[i],codes)
         #print(settings[i])
-    except:
+    except Exception as e:
+        print(e)
         continue
 
