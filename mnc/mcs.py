@@ -12,6 +12,7 @@ import uuid
 import etcd3
 import base64
 import signal
+import warnings
 try:
     from io import BytesIO
 except ImportError:
@@ -582,7 +583,7 @@ class Client(object):
             value = MonitorPoint.from_json(value[0])
             return value
         except Exception as e:
-            print('ERROR2:', str(e))
+            warnings.warn("Error reading monitor point '/mon/%s/%s': %s" % (id, name, str(e)), RuntimeWarning)
             return None
             
     def list_monitor_points(self, id=None):
@@ -671,7 +672,7 @@ class Client(object):
                 output.append((value[1].key, MonitorPoint.from_json(value[0])))
             return output
         except Exception as e:
-            print('ERROR3:', str(e))
+            warnings.warn("Error reading monitor point branch '/mon/%s/%s': %s" % (id, name, str(e)), RuntimeWarning)
             return None
             
     def set_monitor_point_branch_callback(self, name, callback, id=None):
@@ -825,5 +826,5 @@ class Client(object):
             
             return True, found
         except Exception as e:
-            print('ERROR1:', str(e))
+            warnings.warn("Error sending command to '/cmd/%s/%s': %s" % (subsystem, command, str(e)), RuntimeWarning)
             return False, s_id
