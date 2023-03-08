@@ -131,13 +131,14 @@ xengines:
     10.41.0.24-10000: [3440, 3536]
     10.41.0.24-20000: [3536, 3632]
 
+#  x_dest_corr_name: ["lwacalim01", "lwacalim02", "lwacalim03", "lwacalim04", "lwacalim05", "lwacalim06", "lwacalim07", "lwacalim08"]  # where gpu servers send data (usually maps one-to-one from gpu to calim node)
   x_dest_corr_name:    # where gpu servers send data (usually maps one-to-one from gpu to calim node)
-    lxdlwagpu01: lwacalim01
-    lxdlwagpu02: lwacalim02
-    lxdlwagpu03: lwacalim03
-    lxdlwagpu04: lwacalim04
-    lxdlwagpu05: lwacalim05
-    lxdlwagpu06: lwacalim06
+    lxdlwagpu01: lwacalim04
+    lxdlwagpu02: lwacalim06
+    lxdlwagpu03: lwacalim01
+    lxdlwagpu04: lwacalim02
+    lxdlwagpu05: lwacalim03
+    lxdlwagpu06: lwacalim05
     lxdlwagpu07: lwacalim07
     lxdlwagpu08: lwacalim08
   x_dest_corr_slow_port: [10001, 10001, 10002, 10002]
@@ -149,7 +150,6 @@ xengines:
 
 # IP address of each data recorder server (used by x-eng control)
 drip_mapping:
-  lwacalim00: "10.41.0.75"
   lwacalim01: "10.41.0.76"
   lwacalim02: "10.41.0.77"
   lwacalim03: "10.41.0.78"
@@ -158,8 +158,6 @@ drip_mapping:
   lwacalim06: "10.41.0.81"
   lwacalim07: "10.41.0.82"
   lwacalim08: "10.41.0.83"
-  lwacalim09: "10.41.0.84"
-  lwacalim10: "10.41.0.85"
 
 # Data recorder configuration
 dr:

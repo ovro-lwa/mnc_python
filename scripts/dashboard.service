@@ -1,0 +1,31 @@
+[Unit]
+Description=OVRO-LWA dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Run as the specified user
+User=ubuntu
+
+# Allow unlimited locked memory
+LimitMEMLOCK=infinity
+
+# Logging
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=dashboard
+
+# Run before process
+ExecStartPre=/bin/bash -c '[ -d /home/ubuntu/log ] || mkdir -p /home/ubuntu/log'
+
+# Setup the environment
+Environment=PYTHONUNBUFFERED=1
+
+ExecStart=/home/ubuntu/anaconda3/envs/casa/bin/panel serve /home/ubuntu/proj/lwa-shell/mnc_python/notebooks/LWA_dashboard.ipynb --port 5006 --session-token-expiration 300
+
+Restart=always
+RestartSec=60
+StartLimitBurst=3
+
+[Install]
+WantedBy=multi-user.target

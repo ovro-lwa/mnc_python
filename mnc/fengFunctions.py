@@ -1,5 +1,6 @@
 # myfengFunctions.py
-# F engine control
+# Low-level F-engine control
+# by Larry D'Addario with small modifications by Casey Law
 
 # 20220310 - add adcPowerSave().
 # 20221006 - add get_spectra().
@@ -36,7 +37,7 @@ def myfengines():
         id='snap'+'%02d'%(snaps[i])
         print("###SNAP2:",id)
         try:
-            f.append(snap2_fengine.Snap2Fengine(id))
+            f.append(snap2_fengine.Snap2FengineEtcd(id))
         except:
             continue
 
