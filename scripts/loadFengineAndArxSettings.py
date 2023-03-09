@@ -10,6 +10,8 @@
 # 20230217 Add optional setting of unused dsig feng inputs to use_zero.
 # 20230217 Make output less verbose.
 # 20230218 Set ~unused feng inputs to use_adc().
+# 20230304 Revised to include a list of which SNAP2 boards to load.
+# 20230304 Define 'dsig2feng()' here to avoid dependence on 'fengFunctions' package.
 
 import sys
 import scipy.io as mat
@@ -20,20 +22,27 @@ import numpy as np
 DELAY_OFFSET = 10 # minimum delay
 ADC_CLOCK = 196000000    # sampling clock frequency, Hz
 ETCDHOST = 'etcdv3service.sas.pvt'
+snaps = range(1,12)
 
+def dsig2feng(digitalSignal): # From digital sig num calculate F-unit location and signal
+    funit = int(digitalSignal/64) + 1  # location, 1:11
+    fsig = digitalSignal % 64          # FPGA signal number, 0:63
+    return (funit,fsig)
 
 # Read configuration data file
 config = mat.loadmat(sys.argv[1],squeeze_me=True)
 print('Read data file',sys.argv[1])
-# print('Data file internal time: ',time.asctime(time.gmtime(config['time'])))
+print('Data file internal time: ',time.asctime(time.gmtime(config['time'])))
 cfgkeys = config.keys()
 
 # Establish interface to F engines on SNAP2 boards
 #import myfengines as f
-from mnc.fengFunctions import dsig2feng
+#from fengFunctions import dsig2feng
 from lwa_f import snap2_feng_etcd_client
 ec = snap2_feng_etcd_client.Snap2FengineEtcdControl(ETCDHOST)
 print('Connected to ETCD host %s' % ETCDHOST)
+
+print('Loading settings to SNAP2 boards:',snaps)
 
 #=================================
 # SET F ENGINE FFT SHIFT SCHEDULE
@@ -44,9 +53,9 @@ if 'fftShift' in cfgkeys:
 else:
     fftshift = 0x1FFC
 
-for i in range(11):
+for i in snaps:
     #f.f[i].pfb.set_fft_shift(0x1FFF)  # Request shift at all FFT stages
-    ec.send_command(i+1,'pfb','set_fft_shift',kwargs={'shift':int(fftshift)})
+    ec.send_command(i,'pfb','set_fft_shift',kwargs={'shift':int(fftshift)})
 print('All FFT shifts set to','%04X' % fftshift)
 
 
@@ -63,6 +72,7 @@ if k in cfgkeys:
     dsig = config[k]
     for i in dsig:
         loc = dsig2feng(i)
+        if not loc[0] in snaps: continue
         #f.f[loc[0]-1].eq.set_coeffs(int(loc[1]),coef[0])
         ec.send_command(loc[0],'eq','set_coeffs',kwargs={'stream':int(int(loc[1])),'coeffs':coef[0].tolist()})
         dsigDone.append(i)
@@ -73,6 +83,7 @@ if k in cfgkeys:
     dsig = config[k]
     for i in dsig:
         loc = dsig2feng(i)
+        if not loc[0] in snaps: continue
         #f.f[loc[0]-1].eq.set_coeffs(int(loc[1]),coef[1])
         ec.send_command(loc[0],'eq','set_coeffs',kwargs={'stream':int(loc[1]),'coeffs':coef[1].tolist()})
         dsigDone.append(i)
@@ -83,6 +94,7 @@ if k in cfgkeys:
     dsig = config[k]
     for i in dsig:
         loc = dsig2feng(i)
+        if not loc[0] in snaps: continue
         #f.f[loc[0]-1].eq.set_coeffs(int(loc[1]),coef[2])
         ec.send_command(loc[0],'eq','set_coeffs',kwargs={'stream':int(loc[1]),'coeffs':coef[2].tolist()})
         dsigDone.append(i)
@@ -93,6 +105,7 @@ if k in cfgkeys:
     dsig = config[k]
     for i in dsig:
         loc = dsig2feng(i)
+        if not loc[0] in snaps: continue
         #f.f[loc[0]-1].eq.set_coeffs(int(loc[1]),coef[3])
         ec.send_command(loc[0],'eq','set_coeffs',kwargs={'stream':int(loc[1]),'coeffs':coef[3].tolist()})
         dsigDone.append(i)
@@ -113,6 +126,7 @@ if k in cfgkeys:
     dsig = config[k]
     for i in dsig:
         loc = dsig2feng(i)
+        if not loc[0] in snaps: continue        
         #f.f[loc[0]-1].eq.set_coeffs(int(loc[1]),coef[5])
         ec.send_command(loc[0],'eq','set_coeffs',kwargs={'stream':int(loc[1]),'coeffs':coef[5].tolist()})
         dsigDone.append(i)
@@ -123,6 +137,7 @@ if k in cfgkeys:
     dsig = config[k]
     for i in dsig:
         loc = dsig2feng(i)
+        if not loc[0] in snaps: continue
         #f.f[loc[0]-1].eq.set_coeffs(int(loc[1]),coef[6])
         ec.send_command(loc[0],'eq','set_coeffs',kwargs={'stream':int(loc[1]),'coeffs':coef[6].tolist()})
         dsigDone.append(i)
@@ -132,6 +147,7 @@ if k in cfgkeys:
 for i in range(704):  # all others
     if i in dsigDone: continue
     loc = dsig2feng(i)
+    if not loc[0] in snaps: continue    
     #f.f[loc[0]-1].eq.set_coeffs(int(loc[1]),coef[0])
     ec.send_command(loc[0],'eq','set_coeffs',kwargs={'stream':int(loc[1]),'coeffs':coef[0].tolist()})
     
@@ -162,6 +178,7 @@ if 'delay_dsig' in config.keys():
 
     for dsig in range(len(delays_ns)):
         sig = dsig2feng(dsig)
+        if not sig[0] in snaps: continue
         snap_id = sig[0]
         input_id = sig[1]
         #print('Loading delays:',dsig,snap_id,input_id)
@@ -172,16 +189,26 @@ if 'delay_dsig' in config.keys():
 # SET UNUSED F INPUTS TO ZERO
 #----------------------------
 
-for i in range(704):
-    sig = dsig2feng(i)
-    snap_id = sig[0]
-    input_id = sig[1]
-    ec.send_command(snap_id, 'input', 'use_adc', kwargs={'stream':input_id})
+if 'unused' in cfgkeys:
+    print('SETTING UNUSED F ENG INPUTS TO ZERO.')
+    unused = config['unused']
+    for i in range(704):
+        sig = dsig2feng(i)
+        if not sig[0] in snaps: continue        
+        snap_id = sig[0]
+        input_id = sig[1]
+        if unused[i]==True:
+            ec.send_command(snap_id, 'input', 'use_zero', kwargs={'stream':input_id})
+        else:
+            ec.send_command(snap_id, 'input', 'use_adc', kwargs={'stream':input_id})
+    print('Set',sum(unused),'inputs to use_zero and',sum(1-unused),'inputs to use_adc.')
+            
+
 #======================
 # NOW LOAD ARX SETTINGS
 #----------------------
 
-import mnc.myarx as a
+import myarx as a
 
 adrs = config['adrs']
 settings = config['settings']
@@ -197,7 +224,6 @@ for i in range(len(adrs)):
         a.raw(adrs[i],'SETA'+codes)
         print('Loaded: ',adrs[i],codes)
         #print(settings[i])
-    except Exception as e:
-        print(e)
+    except:
         continue
 
