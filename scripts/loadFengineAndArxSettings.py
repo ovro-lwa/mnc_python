@@ -208,7 +208,7 @@ if 'unused' in cfgkeys:
 # NOW LOAD ARX SETTINGS
 #----------------------
 
-import myarx as a
+import mnc.myarx as a
 
 adrs = config['adrs']
 settings = config['settings']
