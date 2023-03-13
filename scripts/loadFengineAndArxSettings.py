@@ -201,6 +201,9 @@ if 'unused' in cfgkeys:
             ec.send_command(snap_id, 'input', 'use_zero', kwargs={'stream':input_id})
         else:
             ec.send_command(snap_id, 'input', 'use_adc', kwargs={'stream':input_id})
+else:
+    ec.send_command(0, 'input', 'use_adc')
+
     print('Set',sum(unused),'inputs to use_zero and',sum(1-unused),'inputs to use_adc.')
             
 
@@ -224,6 +227,6 @@ for i in range(len(adrs)):
         a.raw(adrs[i],'SETA'+codes)
         print('Loaded: ',adrs[i],codes)
         #print(settings[i])
-    except:
+    except Exception as e:
+        print(e)
         continue
-
