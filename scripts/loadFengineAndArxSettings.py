@@ -227,6 +227,6 @@ for i in range(len(adrs)):
         a.raw(adrs[i],'SETA'+codes)
         print('Loaded: ',adrs[i],codes)
         #print(settings[i])
-    except:
+    except Exception as e:
+        print(e)
         continue
-
