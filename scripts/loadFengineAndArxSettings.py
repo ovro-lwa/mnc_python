@@ -185,23 +185,7 @@ if 'delay_dsig' in config.keys():
         ec.send_command(snap_id, 'delay', 'set_delay', kwargs={'stream':input_id, 'delay':int(delays_to_apply_clocks[dsig])})
         #f.f[snap_id-1].delay.set_delay(input_id,int(delays_to_apply_clocks[dsig]))
 
-#============================
-# SET UNUSED F INPUTS TO ZERO
-#----------------------------
-
-if 'unused' in cfgkeys:
-    print('SETTING UNUSED F ENG INPUTS TO ZERO.')
-    unused = config['unused']
-    for i in range(704):
-        sig = dsig2feng(i)
-        if not sig[0] in snaps: continue        
-        snap_id = sig[0]
-        input_id = sig[1]
-        if unused[i]==True:
-            ec.send_command(snap_id, 'input', 'use_zero', kwargs={'stream':input_id})
-        else:
-            ec.send_command(snap_id, 'input', 'use_adc', kwargs={'stream':input_id})
-    print('Set',sum(unused),'inputs to use_zero and',sum(1-unused),'inputs to use_adc.')
+ec.send_command(0, 'input', 'use_adc')
             
 
 #======================
