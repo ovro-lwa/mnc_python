@@ -11,10 +11,9 @@ LOG=~/deploy_mnc-python_$DATE.log
 
 if [[ $HOSTNAME =~ 'calim' ]]; then
     echo "$DATE" >> $LOG 2>>$LOG
-#    conda activate datarecorder  >> $LOG 2>>$LOG  # choose environment
-    which python >> $LOG 2>>$LOG
-    git describe >> $LOG 2>>$LOG
-    pip install . >> $LOG 2>>$LOG
+    conda run -n datarecorder which python >> $LOG 2>>$LOG
+    conda run -n datarecorder git describe >> $LOG 2>>$LOG
+    conda run -n datarecorder pip install . >> $LOG 2>>$LOG
 else
     echo "Not installing on this host"
 fi
