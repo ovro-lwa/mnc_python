@@ -1,5 +1,4 @@
 from setuptools import setup
-from version import get_git_version
 from setuptools_scm import get_version
 
 setup(name='mnc-python',
