@@ -1,8 +1,20 @@
 #!/bin/bash
+set -ex
 
-# Installs contents of this repo.
-LOG=~/deploy_dsa110-pyutils.log
-DATE="`date --iso-8601='seconds'`"
-echo "$DATE: `which python`" > $LOG
-output=`pip install .`
-echo "$DATE: $output" >> $LOG
+echo $HOSTNAME  # should be installing on calim
+echo $PWD  # should be base of code repo
+whoami  # should be user pipeline (or ubuntu?)
+
+# setup
+DATE=$(date --iso-8601=seconds)
+LOG=~/deploy_mnc-python_$DATE.log
+
+if [[ $HOSTNAME =~ 'calim' ]]; then
+    echo "$DATE" >> $LOG 2>>$LOG
+#    conda activate datarecorder  >> $LOG 2>>$LOG  # choose environment
+    which python >> $LOG 2>>$LOG
+    git describe >> $LOG 2>>$LOG
+    pip install . >> $LOG 2>>$LOG
+else
+    echo "Not installing on this host"
+fi
