@@ -5,6 +5,7 @@ import numpy as np
 import glob
 from dsautils import dsa_store
 from lwautils import lwa_arx   # arx
+from lwa_antpos import mapping
 import time
 
 from mnc.common import get_logger
@@ -241,7 +242,31 @@ class Controller():
 
         if 'drvf' in recorders:
             logger.info("Configuring x-engine for fast visibilities")
+            # Empty array for visibility selection indices
+            fast_vis_out = np.zeros([self.pcontroller.pipelines[0].corr_subsel.nvis_out, 2, 2], dtype=int)
+            # "LWA-007"-style antenna names for fast visibilities
+            fast_antnames = xconf.get('fast_vis_ants', [])
+            if len(fast_antnames) == 0:
+                logger.warning('No antennas selected for fast visibilities because there was no "xengines:fast_vis_ants" key')
+            fast_corrids = []
+            for antname in fast_antnames:
+                try:
+                    fast_corrids += [mapping.antname_to_correlator(antname)]
+                except KeyError:
+                    logger.error(f'Couldn\'t convert antenna {antname} to a correlator index')
+                    logger.info('Continuing without this antenna')
+            # Construct list of all baselines (including autos) for antennas in the list
+            fast_vis_n = 0
+            for corridn_a, corrid_a in enumerate(fast_corrids):
+                for corridn_b, corrid_b in enumerate(fast_corrids[corridn_a:]):
+                    # Add all 4 polarization products
+                    fast_vis_out[fast_vis_n+0] = [[corrid_a, 0], [corrid_b, 0]]
+                    fast_vis_out[fast_vis_n+1] = [[corrid_a, 0], [corrid_b, 1]]
+                    fast_vis_out[fast_vis_n+2] = [[corrid_a, 1], [corrid_b, 1]]
+                    fast_vis_out[fast_vis_n+3] = [[corrid_a, 1], [corrid_b, 0]]
+                    fast_vis_n += 4
             for i in range(self.npipeline*self.nhosts):
+                self.pcontroller.pipelines[i].corr_subsel.set_baseline_select(fast_vis_out)
                 self.pcontroller.pipelines[i].corr_output_part.set_destination(self.x_dest_corr_ip[i], self.x_dest_corr_fast_port[i%4])
         else:
             logger.info("Not configuring x-engine for fast visibilities")            
