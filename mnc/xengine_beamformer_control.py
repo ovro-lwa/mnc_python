@@ -207,17 +207,17 @@ class BeamPointingControl(object):
             with AllowedPipelineFailure(p):
                 p.beamform_vlbi_output.set_destination(addr, port)
                 
-    def _freq_to_pipeline(self, freq_to_find):
+    def _freq_range_to_pipeline(self, first_freq, last_freq):
         """
-        Given a frequency in Hz, return the pipeline index where that frequency
-        can be found in the data.  Raises a ValueError if there does not appear
-        to be a corresponding pipeline.
+        Given the first and last values of a frequency range in Hz, return the
+        pipeline index where that frequency can be found in the data.  Raises a
+        ValueError if there does not appear to be a corresponding pipeline.
         """
         
         for i,freq in enumerate(self.freqs):
-            if freq_to_find >= freq[0] and freq_to_find <= freq[-1]:
+            if first_freq == freq[0] and last_freq == freq[-1]:
                 return i
-        raise ValueError(f"Cannot associate {freq_to_find/1e6:.3f} MHz with any pipeline currently under control")
+        raise ValueError(f"Cannot associate {first_freq/1e6:.3f} to {last_freq/1e6:.3f} MHz with any pipeline currently under control")
         
     def set_beam_calibration(self, caltable, verbose=True):
         """
@@ -259,15 +259,13 @@ class BeamPointingControl(object):
         subband_pipelines = []
         subband_pipeline_index = []
         for i in range(NPIPELINE_SUBBAND):
-            ## Get the frequency range for the pipeline in the subband and pull
-            ## out the middle
-            center_freq = calfreq[i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE]
-            center_freq = center_freq[center_freq.size//2]
+            ## Get the frequency range for the pipeline in the subband
+            subband_freq = calfreq[i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE]
             
             ## Try to map that frequency to a pipeline.  If it works, save the
             ## pipeline to subband_pipelines.
             try:
-                j = self._freq_to_pipeline(center_freq)
+                j = self._freq_range_to_pipeline(subband_freq[0], subband_freq[-1])
                 subband_pipelines.append(self.pipelines[j])
                 subband_pipeline_index.append(j)
                 if verbose:
