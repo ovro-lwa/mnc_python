@@ -121,16 +121,20 @@ class Controller():
         for adr in aconf['adrs']:
             ma.load_cfg(adr, preset)
 
-    def start_fengine(self, initialize=False, program=False, force=False, useetcd=True):
+    def start_fengine(self, snap2names=None, initialize=False, program=False, force=False, useetcd=True):
         """ Start the fengines on all snap2s.
-        Defaults to all listed in "snap2s_inuse" field of configuration file.
+        snap2names argument allows a list of board names (e.g., ['snap02']), but defaults configuration file.
         Optionally can initialize and program.
         force will run cold_start method regardless of current state.
         useetcd will route f-engine commands through etcd interface instead of directly.
         """
 
         fconf = self.conf['fengines']
-        snap2names = fconf['snap2s_inuse']
+        if snap2names is None:
+            snap2names = fconf['snap2s_inuse']
+        if not isinstance(snap2names, list):
+            snap2names = [snap2names]
+
         chans_per_packet = fconf['chans_per_packet']
         fft_shift = fconf['fft_shift']
         macs = self.conf['xengines']['arp']
@@ -143,10 +147,21 @@ class Controller():
             nchan = chans[1] - start_chan
             dests += [{'ip':dest_ip, 'port':dest_port, 'start_chan':start_chan, 'nchan':nchan}]
 
-        for snap2name in snap2names:
-            if useetcd:
-                f = snap2_fengine.Snap2FengineEtcd(snap2name, etcdhost=self.etcdhost)
-            else:
+        if useetcd:
+            ec = snap2_fengine_etcd_client.Snap2FengineEtcdControl()
+            is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
+            snap2nums = [int(snap2name.lstrip('snap')) for snap2name in snap2names]
+#            is_programmed = 
+#            if program and is_programmed:
+#                logger.info(f'{snap2name} is already programmed.')
+                
+            if initialize or program:
+                ec.send_command(i, 'feng', 'cold_start_from_config',
+                                kwargs={'config_file': '/home/ubuntu/proj/lwa-shell/mnc-python/config/lwa_corr_config.yaml',
+                                        'program': program, 'initialize': initialize},
+                                timeout=20, n_response_expected=11)
+        else:
+            for snap2name in snap2names:
                 f = snap2_fengine.Snap2Fengine(snap2name)
 
             if program and f.fpga.is_programmed():
