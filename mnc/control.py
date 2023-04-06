@@ -121,7 +121,7 @@ class Controller():
         for adr in aconf['adrs']:
             ma.load_cfg(adr, preset)
 
-    def start_fengine(self, snap2names=None, initialize=False, program=False, force=False, useetcd=True):
+    def start_fengine(self, snap2names=None, initialize=False, program=False, force=False):
         """ Start the fengines on all snap2s.
         snap2names argument allows a list of board names (e.g., ['snap02']), but defaults configuration file.
         Optionally can initialize and program.
@@ -135,62 +135,32 @@ class Controller():
         if not isinstance(snap2names, list):
             snap2names = [snap2names]
 
-        chans_per_packet = fconf['chans_per_packet']
-        fft_shift = fconf['fft_shift']
-        macs = self.conf['xengines']['arp']
+        ec = snap2_fengine_etcd_client.Snap2FengineEtcdControl()
+        is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
+        is_connected = ec.send_command(0, 'fpga', 'is_connected', n_response_expected=11)
 
-        dests = []
-        for xeng, chans in self.conf['xengines']['chans'].items():
-            dest_ip = xeng.split('-')[0]
-            dest_port = int(xeng.split('-')[1])
-            start_chan = chans[0]
-            nchan = chans[1] - start_chan
-            dests += [{'ip':dest_ip, 'port':dest_port, 'start_chan':start_chan, 'nchan':nchan}]
+        if initialize or program:
+            if snap2names == fconf['snap2s_inuse']:
+                if not all(is_programmed.values()) or not all(is_connected.values()) or force:
+                    ec.send_command(0, 'feng', 'cold_start_from_config',
+                                    kwargs={'config_file': '/home/ubuntu/proj/lwa-shell/mnc-python/config/lwa_corr_config.yaml',
+                                            'program': program, 'initialize': initialize},
+                                    timeout=20, n_response_expected=11)
+                else:
+                    logger.info('All snaps already programmed.')
 
-        if useetcd:
-            ec = snap2_fengine_etcd_client.Snap2FengineEtcdControl()
-            is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
-            snap2nums = [int(snap2name.lstrip('snap')) for snap2name in snap2names]
-#            is_programmed = 
-#            if program and is_programmed:
-#                logger.info(f'{snap2name} is already programmed.')
-                
-            if initialize or program:
-                ec.send_command(i, 'feng', 'cold_start_from_config',
-                                kwargs={'config_file': '/home/ubuntu/proj/lwa-shell/mnc-python/config/lwa_corr_config.yaml',
-                                        'program': program, 'initialize': initialize},
-                                timeout=20, n_response_expected=11)
-        else:
-            for snap2name in snap2names:
-                f = snap2_fengine.Snap2Fengine(snap2name)
-
-            if program and f.fpga.is_programmed():
-                logger.info(f'{snap2name} is already programmed.')
-
-            if f.is_connected() and not force:
-                logger.info(f'{snap2name} is already connected.')
-                continue
             else:
-                logger.info(f'Starting f-engine on {snap2name}')
-
-                localconf = fconf.get(snap2name, None)
-                if localconf is None:
-                    logger.error(f"No configuration for F-engine host {snap2name}")
-                    raise RuntimeError(f"No config found for F-engine host {snap2name}")
-                
-                first_stand_index = localconf['ants'][0]
-                nstand = localconf['ants'][1] - first_stand_index
-                source_ip = localconf['gbe']
-                source_port = localconf['source_port']
-
-                f.cold_start(program = program, initialize = initialize, fft_shift=fft_shift,
-                             #test_vectors = test_vectors, sync = sync,
-#                             sw_sync = sw_sync, enable_eth = enable_eth,
-                             chans_per_packet = chans_per_packet,
-                             first_stand_index = first_stand_index, nstand = nstand, macs = macs, source_ip = source_ip,
-                             source_port = source_port, dests = dests)
-                
-                f.print_status_all()
+                for snap2name in snap2names:
+                    if not all(is_programmed.values()) or not all(is_connected.values()) or force:
+                        ec.send_command(int(snap2name.lstrip('snap')), 'feng', 'cold_start_from_config',
+                                        kwargs={'config_file': '/home/ubuntu/proj/lwa-shell/mnc-python/config/lwa_corr_config.yaml',
+                                                'program': program, 'initialize': initialize},
+                                        timeout=20, n_response_expected=11)
+                    else:
+                        logger.info(f'{snap2name} already programmed.')
+        else:
+            if not all(is_programmed.values()) or not all(is_connected.values()):
+                logger.warn("Not all snaps are ready. \n Programmed: {is_programmed}. \n Connected: {is_connected}")
 
     def status_fengine(self):
         """ Use snap2 etcd client to poll for stats on each fengine.
