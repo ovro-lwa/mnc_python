@@ -1,3 +1,4 @@
+import os.path
 import yaml
 import logging
 import glob
@@ -30,7 +31,7 @@ class Controller():
     """
 
     def __init__(self, config_file='config/lwa_config.yaml', etcdhost=None, xhosts=None, npipeline=None):
-        self.config_file = config_file
+        self.config_file = os.path.abspath(config_file)
         conf = self.parse_config(config_file)
 
         self.conf = conf
