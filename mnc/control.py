@@ -135,7 +135,7 @@ class Controller():
         if not isinstance(snap2names, list):
             snap2names = [snap2names]
 
-        ec = snap2_fengine_etcd_client.Snap2FengineEtcdControl()
+        ec = snap2_feng_etcd_client.Snap2FengineEtcdControl()
         is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
         is_connected = ec.send_command(0, 'fpga', 'is_connected', n_response_expected=11)
 
@@ -143,7 +143,7 @@ class Controller():
             if snap2names == fconf['snap2s_inuse']:
                 if not all(is_programmed.values()) or not all(is_connected.values()) or force:
                     ec.send_command(0, 'feng', 'cold_start_from_config',
-                                    kwargs={'config_file': '/home/ubuntu/proj/lwa-shell/mnc-python/config/lwa_corr_config.yaml',
+                                    kwargs={'config_file': self.config_file,
                                             'program': program, 'initialize': initialize},
                                     timeout=20, n_response_expected=11)
                 else:
@@ -153,7 +153,7 @@ class Controller():
                 for snap2name in snap2names:
                     if not all(is_programmed.values()) or not all(is_connected.values()) or force:
                         ec.send_command(int(snap2name.lstrip('snap')), 'feng', 'cold_start_from_config',
-                                        kwargs={'config_file': '/home/ubuntu/proj/lwa-shell/mnc-python/config/lwa_corr_config.yaml',
+                                        kwargs={'config_file': self.config_file,
                                                 'program': program, 'initialize': initialize},
                                         timeout=20, n_response_expected=11)
                     else:
