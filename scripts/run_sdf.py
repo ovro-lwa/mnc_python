@@ -298,10 +298,9 @@ def parse_sdf(filename):
                 nchan = int(nchan, 10)
                 nwin = int(nwin, 10)
                 tint = (nchan*nwin / 19.6e6)
-                time_avg = int(round(tint / tint_native))
-                while 1000 % time_avg != 0 and time_avg < 1000:
-                    time_avg += 1
-                time_avg = min([time_avg, 1000])
+                time_avg = 2**int(round(numpy.log(tint / tint_native) / numpy.log(2)))
+                time_avg = max([1, time_avg])
+                time_avg = min([time_avg, 1024])
                 
         # Add on that last observation
         obs.append(temp)
