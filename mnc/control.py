@@ -24,13 +24,16 @@ except ImportError:
 from mnc import mcs, xengine_beamformer_control
 
 
+CONFIG_FILE = '/home/pipeline/proj/lwa-shell/mnc_python/config/lwa_config_calim.yaml'
+
+
 class Controller():
     """ Parse configuration and control all subsystems in uniform manner.
     Ideally, will also make it easy to monitor basic system status.
     etcdhost is used by x-engine. data recorders use value set in mnc/common.py code.
     """
 
-    def __init__(self, config_file='config/lwa_config.yaml', etcdhost=None, xhosts=None, npipeline=None):
+    def __init__(self, config_file=CONFIG_FILE, etcdhost=None, xhosts=None, npipeline=None):
         self.config_file = os.path.abspath(config_file)
         conf = self.parse_config(config_file)
 
