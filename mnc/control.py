@@ -125,9 +125,8 @@ class Controller():
     def start_fengine(self, snap2names=None, initialize=False, program=False, force=False):
         """ Start the fengines on all snap2s.
         snap2names argument allows a list of board names (e.g., ['snap02']), but defaults configuration file.
-        Optionally can initialize and program.
-        force will run cold_start method regardless of current state.
-        useetcd will route f-engine commands through etcd interface instead of directly.
+        Optionally can initialize and program, which will also run cold_start method regardless of current state.
+        The config_file used should be available to the pipeline@lwacalimxx user (e.g., /home/pipeline/proj/lwa-shell/mnc_python/config/lwa...*yaml).
         """
 
         fconf = self.conf['fengines']
@@ -138,40 +137,35 @@ class Controller():
 
         ec = snap2_feng_etcd_client.Snap2FengineEtcdControl()
         is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
-        is_connected = ec.send_command(0, 'fpga', 'is_connected', n_response_expected=11)
 
         if initialize or program:
             if snap2names == fconf['snap2s_inuse']:
-                if not all(is_programmed.values()) or not all(is_connected.values()) or force:
-                    if program:
-                        ec.send_command(0, 'feng', 'program', timeout=60*7, n_response_expected=11)
-                    if initialize:
-                        ec.send_command(0, 'feng', 'initialize', kwargs={'read_only':False}, timeout=60*5, n_response_expected=11)
-
-                    ec.send_command(0, 'feng', 'cold_start_from_config', kwargs={'config_file': self.config_file,
-                                                                                 'program': False, 'initialize': True},
-                                    timeout=20, n_response_expected=11)
+                if (not all(is_programmed.values()) or force) and program:
+                    ec.send_command(0, 'feng', 'program', timeout=60*7, n_response_expected=11)
+                    ec.send_command(0, 'feng', 'initialize', kwargs={'read_only':False}, timeout=60*5, n_response_expected=11)
                 else:
                     logger.info('All snaps already programmed.')
+
+                ec.send_command(0, 'feng', 'cold_start_from_config', kwargs={'config_file': self.config_file,
+                                                                             'program': False, 'initialize': True},
+                                timeout=60*5, n_response_expected=11)
 
             else:
                 for snap2name in snap2names:
                     snap2num = int(snap2name.lstrip('snap'))
-                    if not all(is_programmed.values()) or not all(is_connected.values()) or force:
-                        if program:
-                            ec.send_command(snap2num, 'feng', 'program', timeout=60*7, n_response_expected=11)
-                        if initialize:
-                            ec.send_command(snap2num, 'feng', 'initialize', kwargs={'read_only':False}, timeout=60*5, n_response_expected=11)
-
-                        ec.send_command(snap2num, 'feng', 'cold_start_from_config', kwargs={'config_file': self.config_file,
-                                                                                            'program': program,
-                                                                                            'initialize': initialize},
-                                        timeout=20, n_response_expected=11)
+                    if (not all(is_programmed.values()) or force) and program:
+                        ec.send_command(snap2num, 'feng', 'program', timeout=60, n_response_expected=1)
+                        ec.send_command(snap2num, 'feng', 'initialize', kwargs={'read_only':False}, timeout=30, n_response_expected=1)
                     else:
                         logger.info(f'{snap2name} already programmed.')
+
+                    ec.send_command(snap2num, 'feng', 'cold_start_from_config', kwargs={'config_file': self.config_file,
+                                                                                        'program': False,
+                                                                                        'initialize': True},
+                                    timeout=30, n_response_expected=1)
         else:
-            if not all(is_programmed.values()) or not all(is_connected.values()):
-                logger.warn("Not all snaps are ready. \n Programmed: {is_programmed}. \n Connected: {is_connected}")
+            if not all(is_programmed.values()):
+                logger.warn("Not all snaps are ready. \n Programmed: {is_programmed}.")
 
     def status_fengine(self):
         """ Use snap2 etcd client to poll for stats on each fengine.
