@@ -192,11 +192,11 @@ class BeamPointingControl(object):
                     # Send them out again
                     p.beamform_output.set_destination(addrs, ports)
                     
-    def set_beam_vlbi_dest(self, addr='10.41.0.73', port=21001):
+    def set_beam_vlbi_dest(self, addr='10.41.0.97', port=21001):
         """
         Set the destination IP address and UDP port for the VLBI version of the
         beam data.  Defaults to what is currently used by the "dr-tengine"
-        service on lxdlwagpu09.
+        service on lwateng.
         """
         
         # Validate that this is the correct beam
