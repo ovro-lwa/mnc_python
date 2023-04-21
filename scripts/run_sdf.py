@@ -261,6 +261,7 @@ def parse_sdf(filename):
                     freq1 = float(freq1) / 2**32 * 196e6
                     for i in range(step, len(temp['steps'])):
                         temp['steps'][i]['freq1'] = freq1
+                        temp['steps'][i]['filter'] = active_bw_code
             elif line.startswith('OBS_STP_FREQ2'):
                 if line.find('+') == -1:
                     tag, freq2 = line.rsplit(None, 1)
@@ -268,9 +269,11 @@ def parse_sdf(filename):
                     freq2 = float(freq2) / 2**32 * 196e6
                     for i in range(step, len(temp['steps'])):
                         temp['steps'][i]['freq2'] = freq2
+                        temp['steps'][i]['filter'] = active_bw_code
             elif line.startswith('OBS_BW'):
                 if line.find('+') == -1:
                     temp['filter'] = int(line.rsplit(None, 1)[1], 10)
+                    active_bw_code = temp['filter']
                     
                     try:
                         for i in range(len(temp['steps'])):
@@ -319,8 +322,9 @@ def parse_sdf(filename):
                                  'gain1': o['gain1'],
                                  'gain2': o['gain2']})
             try:
-                expanded_obs[-1]['freq1'] = o['steps'][0]['freq1']
-                expanded_obs[-1]['freq2'] = o['steps'][0]['freq2']
+                expanded_obs[-1]['freq1']  = o['steps'][0]['freq1']
+                expanded_obs[-1]['freq2']  = o['steps'][0]['freq2']
+                expanded_obs[-1]['filter'] = o['steps'][0]['filter']
             except KeyError:
                 pass
             ## Steps 2 through N so that the start time builds off the previous
@@ -335,8 +339,9 @@ def parse_sdf(filename):
                                      'gain1': expanded_obs[-1]['gain1'],
                                      'gain2': expanded_obs[-1]['gain2']})
                 try:
-                    expanded_obs[-1]['freq1'] = s['freq1']
-                    expanded_obs[-1]['freq2'] = s['freq2']
+                    expanded_obs[-1]['freq1']  = s['freq1']
+                    expanded_obs[-1]['freq2']  = s['freq2']
+                    expanded_obs[-1]['filter'] = s['filter']
                 except KeyError:
                     pass
                     
@@ -501,7 +506,10 @@ def main(args):
                 
         name = o['ra']
         if o['dec'] is not None:
-            name = f"{o['ra']} hr, {o['dec']} deg"
+            if not o['azalt']:
+                name = f"{o['ra']} hr, {o['dec']} deg"
+            else:
+                name = f"{o['ra']} deg az, {o['dec']} deg el"
         logger.info(f"Tracking pointing #{i+1} ('{name}') for {o['dur']/1000.0:.3f} s")
         for step in o['sdf_steps']:
             while time.time() + 1 < step[0]:
