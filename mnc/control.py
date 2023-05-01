@@ -223,24 +223,27 @@ class Controller():
         logger.info(f'pipelines up? {self.pcontroller.pipelines_are_up()}')
 
         # slow
-        if 'drvs' in recorders:
-            logger.info("Configuring x-engine for slow visibilities")
+        if 'drvs' in recorders or 'drvf' in recorders:
+            logger.info("Configuring x-engine for visibilities")
             try:
                 self.pcontroller.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_slow_port)  # iterates over all slow corr outputs
             except KeyError:
                 logger.error("KeyError when configuring correlator. Are data being sent from f to x-engines?")
 
         else:
-            logger.info("Not configuring x-engine for slow visibilities")            
+            logger.info("Not configuring x-engine for visibilities")            
 
         if 'drvf' in recorders:
-            logger.info("Configuring x-engine for fast visibilities")
+            fast_antnames = xconf.get('fast_vis_ants', [])
+
+            if len(fast_antnames):
+                logger.info("Selecting antennas for fast visibilities.")
+            elif len(fast_antnames) == 0:
+                logger.warning("No antennas selected for fast visibilities")
+
             # Empty array for visibility selection indices
             fast_vis_out = np.zeros([self.pcontroller.pipelines[0].corr_subsel.nvis_out, 2, 2], dtype=int)
             # "LWA-007"-style antenna names for fast visibilities
-            fast_antnames = xconf.get('fast_vis_ants', [])
-            if len(fast_antnames) == 0:
-                logger.warning('No antennas selected for fast visibilities because there was no "xengines:fast_vis_ants" key')
             fast_corrids = []
             for antname in fast_antnames:
                 try:
