@@ -392,8 +392,6 @@ class Controller():
             # power beams
             try:
                 num = int(recorder[2:], 10)
-                if num not in self.bfc:
-                    logger.warn(f"you should run start_xengine_bf with 'num={num}' before running beamforming data recorders. Proceeding...")
                 if recorder in [f'dr{n}' for n in range(1,11)]:
                     if duration is not None:
                         assert isinstance(time_avg, int)
