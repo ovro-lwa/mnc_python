@@ -7,6 +7,7 @@ import glob
 from dsautils import dsa_store
 from lwautils import lwa_arx   # arx
 from lwa_antpos import mapping
+from astropy.time import Time, TimeDelta
 import time
 
 from mnc.common import get_logger
@@ -370,10 +371,11 @@ class Controller():
 
         self.pcontroller.stop_pipelines()
 
-    def start_dr(self, recorders=None, duration=None, time_avg=1):
+    def start_dr(self, recorders=None, start='now', duration=None, time_avg=1):
         """ Start data recorders listed recorders.
         Defaults to starting those listed in configuration file.
         Recorder list can be overloaded with 'drvs' (etc) or individual recorders (e.g., 'drvs7601').
+        start is either 'now' or a start time (astropy Time, mjd float, and isot strings supported).
         duration is power beam recording in milliseconds.
         time_avg is power beam averaging time in milliseconds (integer converted to next lower power of 2).
         """
@@ -384,6 +386,21 @@ class Controller():
         elif not isinstance(recorders, (list, tuple)):
             recorders = [recorders,]
 
+        # set start time arguments
+        if isinstance(start, str):
+            assert start == 'now'
+            mjd = mpm = start
+        else:
+            if not isinstance(start, Time):
+                try:
+                    start = Time(start, format='isot')
+                except ValueError:
+                    start = Time(start, format='mjd')
+
+            mjd_dt = start.mjd % 1
+            mjd = int((start - TimeDelta(mjd_dt, format='jd')).mjd)
+            mpm = int((start.mjd % 1) * 24 * 3600 * 1e3)
+                
         # start ms writing
         logger.info(f"Starting recorders: {recorders}")
         for recorder in recorders:
@@ -396,8 +413,8 @@ class Controller():
                     if duration is not None:
                         assert isinstance(time_avg, int)
                         time_avg = 2 ** int(np.log2(time_avg))  # set to next lower power of 2
-                        accepted, response = self.drc.send_command(recorder, 'record', start_mjd='now',
-                                                                   start_mpm='now', duration_ms=duration,
+                        accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd,
+                                                                   start_mpm=mpm, duration_ms=duration,
                                                                    time_avg=time_avg)
                     else:
                         logger.warn("Power beam recordings require a duration")
@@ -406,7 +423,7 @@ class Controller():
 
             # visibilities
             if recorder in ['drvs', 'drvf'] + ['drvs' + num for num in self.drvnums]:
-                accepted, response = self.drc.send_command(recorder, 'start', mjd='now', mpm='now')
+                accepted, response = self.drc.send_command(recorder, 'start', mjd=mjd, mpm=mpm)
 
             if not accepted:
                 logger.warn(f"no response from {recorder}")
