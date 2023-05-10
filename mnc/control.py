@@ -399,7 +399,7 @@ class Controller():
 
             mjd_dt = start.mjd % 1
             mjd = int((start - TimeDelta(mjd_dt, format='jd')).mjd)
-            mpm = int((start.mjd % 1) * 24 * 3600 * 1e3)
+            mpm = int(mjd_dt * 24 * 3600 * 1e3)
                 
         # start ms writing
         logger.info(f"Starting recorders: {recorders}")
