@@ -7,6 +7,7 @@ import glob
 from dsautils import dsa_store
 from lwautils import lwa_arx   # arx
 from lwa_antpos import mapping
+from astropy.time import Time, TimeDelta
 import time
 
 from mnc.common import get_logger
@@ -223,24 +224,27 @@ class Controller():
         logger.info(f'pipelines up? {self.pcontroller.pipelines_are_up()}')
 
         # slow
-        if 'drvs' in recorders:
-            logger.info("Configuring x-engine for slow visibilities")
+        if 'drvs' in recorders or 'drvf' in recorders:
+            logger.info("Configuring x-engine for visibilities")
             try:
                 self.pcontroller.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_slow_port)  # iterates over all slow corr outputs
             except KeyError:
                 logger.error("KeyError when configuring correlator. Are data being sent from f to x-engines?")
 
         else:
-            logger.info("Not configuring x-engine for slow visibilities")            
+            logger.info("Not configuring x-engine for visibilities")            
 
         if 'drvf' in recorders:
-            logger.info("Configuring x-engine for fast visibilities")
+            fast_antnames = xconf.get('fast_vis_ants', [])
+
+            if len(fast_antnames):
+                logger.info("Selecting antennas for fast visibilities.")
+            elif len(fast_antnames) == 0:
+                logger.warning("No antennas selected for fast visibilities")
+
             # Empty array for visibility selection indices
             fast_vis_out = np.zeros([self.pcontroller.pipelines[0].corr_subsel.nvis_out, 2, 2], dtype=int)
             # "LWA-007"-style antenna names for fast visibilities
-            fast_antnames = xconf.get('fast_vis_ants', [])
-            if len(fast_antnames) == 0:
-                logger.warning('No antennas selected for fast visibilities because there was no "xengines:fast_vis_ants" key')
             fast_corrids = []
             for antname in fast_antnames:
                 try:
@@ -367,10 +371,11 @@ class Controller():
 
         self.pcontroller.stop_pipelines()
 
-    def start_dr(self, recorders=None, duration=None, time_avg=1):
+    def start_dr(self, recorders=None, start='now', duration=None, time_avg=1):
         """ Start data recorders listed recorders.
         Defaults to starting those listed in configuration file.
         Recorder list can be overloaded with 'drvs' (etc) or individual recorders (e.g., 'drvs7601').
+        start is either 'now' or a start time (astropy Time, mjd float, and isot strings supported).
         duration is power beam recording in milliseconds.
         time_avg is power beam averaging time in milliseconds (integer converted to next lower power of 2).
         """
@@ -381,6 +386,21 @@ class Controller():
         elif not isinstance(recorders, (list, tuple)):
             recorders = [recorders,]
 
+        # set start time arguments
+        if isinstance(start, str):
+            assert start == 'now'
+            mjd = mpm = start
+        else:
+            if not isinstance(start, Time):
+                try:
+                    start = Time(start, format='isot')
+                except ValueError:
+                    start = Time(start, format='mjd')
+
+            mjd_dt = start.mjd % 1
+            mjd = int((start - TimeDelta(mjd_dt, format='jd')).mjd)
+            mpm = int(mjd_dt * 24 * 3600 * 1e3)
+                
         # start ms writing
         logger.info(f"Starting recorders: {recorders}")
         for recorder in recorders:
@@ -389,14 +409,12 @@ class Controller():
             # power beams
             try:
                 num = int(recorder[2:], 10)
-                if num not in self.bfc:
-                    logger.warn(f"you should run start_xengine_bf with 'num={num}' before running beamforming data recorders. Proceeding...")
                 if recorder in [f'dr{n}' for n in range(1,11)]:
                     if duration is not None:
                         assert isinstance(time_avg, int)
                         time_avg = 2 ** int(np.log2(time_avg))  # set to next lower power of 2
-                        accepted, response = self.drc.send_command(recorder, 'record', start_mjd='now',
-                                                                   start_mpm='now', duration_ms=duration,
+                        accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd,
+                                                                   start_mpm=mpm, duration_ms=duration,
                                                                    time_avg=time_avg)
                     else:
                         logger.warn("Power beam recordings require a duration")
@@ -405,7 +423,7 @@ class Controller():
 
             # visibilities
             if recorder in ['drvs', 'drvf'] + ['drvs' + num for num in self.drvnums]:
-                accepted, response = self.drc.send_command(recorder, 'start', mjd='now', mpm='now')
+                accepted, response = self.drc.send_command(recorder, 'start', mjd=mjd, mpm=mpm)
 
             if not accepted:
                 logger.warn(f"no response from {recorder}")
