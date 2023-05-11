@@ -371,12 +371,12 @@ class Controller():
 
         self.pcontroller.stop_pipelines()
 
-    def start_dr(self, recorders=None, start='now', duration=None, time_avg=1):
+    def start_dr(self, recorders=None, t0='now', duration=None, time_avg=1):
         """ Start data recorders listed recorders.
         Defaults to starting those listed in configuration file.
         Recorder list can be overloaded with 'drvs' (etc) or individual recorders (e.g., 'drvs7601').
-        start is either 'now' or a start time (astropy Time, mjd float, and isot strings supported).
-        duration is power beam recording in milliseconds.
+        t0 is either 'now' or a start time (astropy Time, mjd float, and isot strings supported).
+        duration is length of data recording in milliseconds (required for power beam recording; optional for visibilities).
         time_avg is power beam averaging time in milliseconds (integer converted to next lower power of 2).
         """
 
@@ -387,15 +387,15 @@ class Controller():
             recorders = [recorders,]
 
         # set start time arguments
-        if isinstance(start, str):
-            assert start == 'now'
-            mjd = mpm = start
+        if isinstance(t0, str):
+            assert t0 == 'now'
+            mjd = mpm = t0
         else:
-            if not isinstance(start, Time):
+            if not isinstance(t0, Time):
                 try:
-                    start = Time(start, format='isot')
+                    start = Time(t0, format='isot')
                 except ValueError:
-                    start = Time(start, format='mjd')
+                    start = Time(t0, format='mjd')
 
             mjd_dt = start.mjd % 1
             mjd = int((start - TimeDelta(mjd_dt, format='jd')).mjd)
@@ -424,7 +424,9 @@ class Controller():
             # visibilities
             if recorder in ['drvs', 'drvf'] + ['drvs' + num for num in self.drvnums]:
                 accepted, response = self.drc.send_command(recorder, 'start', mjd=mjd, mpm=mpm)
-
+                if duration is not None and response['status'] == 'success':
+                    stop = start + TimeDelta(duration/1e3/24/3600, format='jd')
+                    self.stop_dr(recorders=recorder, t0=stop)
             if not accepted:
                 logger.warn(f"no response from {recorder}")
             elif response['status'] == 'success':
@@ -459,9 +461,11 @@ class Controller():
 
         return statuses
 
-    def stop_dr(self, recorders=None):
+    def stop_dr(self, recorders=None, t0='now', queue_number=1):
         """ Stop data recorders in list recorders.
         Defaults to stopping those listed in configuration file.
+        t0 is stop time (astropy Time object, mjd, or isot format supported).
+        queue_number is index of queued beamformer observations (default stops most recent == 1).
         """
 
         dconf = self.conf['dr']
@@ -470,12 +474,26 @@ class Controller():
         elif not isinstance(recorders, (list, tuple)):
             recorders = [recorders,]
 
+        # set start time arguments
+        if isinstance(t0, str):
+            assert t0 == 'now'
+            mjd = mpm = t0
+        else:
+            if not isinstance(t0, Time):
+                try:
+                    start = Time(t0, format='isot')
+                except ValueError:
+                    start = Time(t0, format='mjd')
+
+            mjd_dt = start.mjd % 1
+            mjd = int((start - TimeDelta(mjd_dt, format='jd')).mjd)
+            mpm = int(mjd_dt * 24 * 3600 * 1e3)
+                
         for recorder in recorders:
             if recorder in ['drvs', 'drvf']:
-                accepted, response = self.drc.send_command(recorder, 'stop', mjd='now', mpm='now')
+                accepted, response = self.drc.send_command(recorder, 'stop', mjd=mjd, mpm=mpm)
             elif recorder[:2] == 'dr':
-                queue = 0  # current observation
-                accepted, response = self.drc.send_command(recorder, 'cancel', queue_number=queue)
+                accepted, response = self.drc.send_command(recorder, 'cancel', queue_number=queue_number)
 
             if not accepted:
                 logger.warn(f"no response from {recorder}")
