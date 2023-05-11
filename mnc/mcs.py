@@ -31,11 +31,6 @@ __all__ = ['MonitorPoint', 'MultiMonitorPoint', 'ImageMonitorPoint',
            'MonitorPointCallbackBase', 'CommandCallbackBase', 'Client']
 
 
-temp = etcd3.client()
-ETCD_TYPE = type(temp)
-del temp
-
-
 class MonitorPoint(object):
     """
     Object for representing a monitoring point within the MCS framework.  At a
@@ -339,7 +334,7 @@ class CommandCallbackBase(object):
     def __init__(self, client):
         if isinstance(client, Client):
             client = client.client
-        elif isinstance(client, ETCD_TYPE):
+        elif isinstance(client, etcd3.Etcd3Client):
             pass
         else:
             raise TypeError("Expected a mcs.Client or etcd3.client.Ectd3Client")
