@@ -32,9 +32,10 @@ class Controller():
     """ Parse configuration and control all subsystems in uniform manner.
     Ideally, will also make it easy to monitor basic system status.
     etcdhost is used by x-engine. data recorders use value set in mnc/common.py code.
+    Can overload default recorders by providing a list or single string name at instantiation.
     """
 
-    def __init__(self, config_file=CONFIG_FILE, etcdhost=None, xhosts=None, npipeline=None):
+    def __init__(self, config_file=CONFIG_FILE, etcdhost=None, xhosts=None, npipeline=None, recorders=None):
         self.config_file = os.path.abspath(config_file)
         conf = self.parse_config(config_file)
 
@@ -43,6 +44,13 @@ class Controller():
         self.xhosts = xhosts
         self.npipeline = npipeline
         self.set_properties()
+
+        allowed = ['drvs', 'drvf'] + [f'dr{n}' for n in range(1,11)]  # correct input recorder names
+        if recorders is not None:
+            if isinstance(recorders, str):
+                recorders = [recorders]
+            recorders = [recorder for recorder in recorders if recorder in allowed]   # clean input
+            self.conf['dr']['recorders'] = recorders
 
         # report
         modes = []
