@@ -410,7 +410,9 @@ class Client(object):
         
         self.client = etcd3.client(host=ETCD_HOST, port=ETCD_PORT)
         self._mon_manifest = ['manifest/monitoring', 'manifest/commands']
+        self._mon_manifest_lock = self.client.lock('mon_manifest_lock', ttl=5)
         self._cmd_manifest = []
+        self._cmd_manifest_lock = self.client.lock('cmd_manifest_lock', ttl=5)
         self._watchers = {}
         
     def __del__(self):
@@ -427,7 +429,7 @@ class Client(object):
         whether or not an update was made.
         """
        
-        with self.client.lock(self.id, ttl=5) as lock:
+        with self._mon_manifest_lock:
             # Is it alread in the local manifest?
             updated = False
             value = None
@@ -475,7 +477,7 @@ class Client(object):
         not an update was made.
         """
        
-        with self.client.lock(self.id, ttl=5) as lock:
+        with self._cmd_manifest_lock:
             # Is it alread in the local manifest?
             updated = False
             value = None
