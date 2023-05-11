@@ -398,12 +398,15 @@ class Controller():
         if isinstance(t0, str):
             assert t0 == 'now'
             mjd = mpm = t0
+            start = Time.now()
         else:
             if not isinstance(t0, Time):
                 try:
                     start = Time(t0, format='isot')
                 except ValueError:
                     start = Time(t0, format='mjd')
+            else:
+                start = t0
 
             mjd_dt = start.mjd % 1
             mjd = int((start - TimeDelta(mjd_dt, format='jd')).mjd)
@@ -432,9 +435,12 @@ class Controller():
             # visibilities
             if recorder in ['drvs', 'drvf'] + ['drvs' + num for num in self.drvnums]:
                 accepted, response = self.drc.send_command(recorder, 'start', mjd=mjd, mpm=mpm)
-                if duration is not None and response['status'] == 'success':
+                if duration is not None:
+                    if response['status'] != 'success':
+                        logger.warn("Data recorder not started successfully. Trying to schedule stop...")
                     stop = start + TimeDelta(duration/1e3/24/3600, format='jd')
                     self.stop_dr(recorders=recorder, t0=stop)
+
             if not accepted:
                 logger.warn(f"no response from {recorder}")
             elif response['status'] == 'success':
@@ -486,12 +492,15 @@ class Controller():
         if isinstance(t0, str):
             assert t0 == 'now'
             mjd = mpm = t0
+            start = Time.now()
         else:
             if not isinstance(t0, Time):
                 try:
                     start = Time(t0, format='isot')
                 except ValueError:
                     start = Time(t0, format='mjd')
+            else:
+                start = t0
 
             mjd_dt = start.mjd % 1
             mjd = int((start - TimeDelta(mjd_dt, format='jd')).mjd)
