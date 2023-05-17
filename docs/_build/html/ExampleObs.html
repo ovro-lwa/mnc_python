@@ -35,34 +35,34 @@
   <section id="example-observations-with-ovro-lwa">
 <h1>Example Observations with OVRO-LWA<a class="headerlink" href="#example-observations-with-ovro-lwa" title="Permalink to this heading">¶</a></h1>
 <p>Start with some common initial steps to set up the controller in Python (development or deployment environment):</p>
-<p>``
-from mnc import control
-con = control.Controller()
-con.status_xengine()
-con.status_dr()
-``</p>
+<p><code class="docutils literal notranslate"><span class="pre">`python</span>
+<span class="pre">from</span> <span class="pre">mnc</span> <span class="pre">import</span> <span class="pre">control</span>
+<span class="pre">con</span> <span class="pre">=</span> <span class="pre">control.Controller()</span>
+<span class="pre">con.status_xengine()</span>
+<span class="pre">con.status_dr()</span>
+<span class="pre">`</span></code></p>
 <p>The status methods display details about how subsystems are set up or if they have errors. This info is also displayed on the OVRO-LWA System Health Dashboard.</p>
 <p>Next, set up the x-engine. To set it up to route data for both slow visibility recording and beamforming with beam 1:</p>
-<p>``
-con.configure_xengine(recorders=[‘drvs’, ‘dr1’], full=True)
-``</p>
+<p><code class="docutils literal notranslate"><span class="pre">`python</span>
+<span class="pre">con.configure_xengine(recorders=['drvs',</span> <span class="pre">'dr1'],</span> <span class="pre">full=True)</span>
+<span class="pre">`</span></code></p>
 <p>After this step, the x-engine status on the dashboard should be green, which means data is being routed from the GPU servers to the data recorders on the Cal-Im nodes. If the x-engine was already set up correctly, then this step will go faster with <cite>full=False</cite>.</p>
 <p>Next, you need to turn the data recorders on. To start slow visibility recording:</p>
-<p>``
-con.start_dr(recorders=’drvs’)
-``</p>
+<p><code class="docutils literal notranslate"><span class="pre">`python</span>
+<span class="pre">con.start_dr(recorders='drvs')</span>
+<span class="pre">`</span></code></p>
 <p>The default is to start immediately and record without end (until the <cite>stop_dr</cite> command). However, the <cite>t0</cite> and <cite>duration</cite> arguments can define the start and length of an observation. <cite>t0</cite> can be in MJD or ISOT format and <cite>duration</cite> must be in milliseconds (e.g., <cite>duration=30*60*1e3</cite> for 30 minutes).</p>
 <p>To start beamformer recording:</p>
-<p>``
-con.start_dr(recorders=’dr1’, t0=’now’, duration=None, time_avg=1)
-con.control_bf(num=1, targetname=&lt;name or (hourangle, deg)&gt;, track=True)
-``</p>
+<p><code class="docutils literal notranslate"><span class="pre">`python</span>
+<span class="pre">con.start_dr(recorders='dr1',</span> <span class="pre">t0='now',</span> <span class="pre">duration=None,</span> <span class="pre">time_avg=1)</span>
+<span class="pre">con.control_bf(num=1,</span> <span class="pre">targetname=&lt;name</span> <span class="pre">or</span> <span class="pre">(hourangle,</span> <span class="pre">deg)&gt;,</span> <span class="pre">track=True)</span>
+<span class="pre">`</span></code></p>
 <p>The number in the name of the data recorder is the same as that used by <cite>control_bf</cite>. Note that the <cite>control_bf</cite> command will start a loop in Python to update the beam pointing. You’ll need to Ctrl-C to stop tracking and/or open a new terminal to issue other commands (e.g., stop the data recorder).</p>
 <p>Finally, to stop observing:</p>
-<p>``
-con.stop_dr()
-con.stop_xengine()
-``</p>
+<p><code class="docutils literal notranslate"><span class="pre">`python</span>
+<span class="pre">con.stop_dr()</span>
+<span class="pre">con.stop_xengine()</span>
+<span class="pre">`</span></code></p>
 <ul class="simple">
 <li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
 <li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
