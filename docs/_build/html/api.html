@@ -1,18 +1,17 @@
 
 <!DOCTYPE html>
 
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
     <title>mnc_python class API &#8212; mnc_python  documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-    <script src="_static/jquery.js"></script>
-    <script src="_static/underscore.js"></script>
     <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx_highlight.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="prev" title="Example Observations with OVRO-LWA" href="ExampleObs.html" />
@@ -33,186 +32,7 @@
           <div class="body" role="main">
             
   <section id="mnc-python-class-api">
-<h1>mnc_python class API<a class="headerlink" href="#mnc-python-class-api" title="Permalink to this headline">¶</a></h1>
-<dl class="py class">
-<dt class="sig sig-object py" id="mnc.control.Controller">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mnc.control.</span></span><span class="sig-name descname"><span class="pre">Controller</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'config/lwa_config.yaml'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">etcdhost</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xhosts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">npipeline</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller" title="Permalink to this definition">¶</a></dt>
-<dd><p>Parse configuration and control all subsystems in uniform manner.
-Ideally, will also make it easy to monitor basic system status.
-etcdhost is used by x-engine. data recorders use value set in mnc/common.py code.</p>
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.configure_xengine">
-<span class="sig-name descname"><span class="pre">configure_xengine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">recorders</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">calibratebeams</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.configure_xengine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.configure_xengine" title="Permalink to this definition">¶</a></dt>
-<dd><p>Start xengines listed in configuration file.
-Recorders is list of recorders to configure output to. Defaults to those in config file.
-Supported modes “drvs” (slow vis), “drvf” (fast vis), “dr[n]” (power beams)</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.control_bf">
-<span class="sig-name descname"><span class="pre">control_bf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coord</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'celestial'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">targetname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">track</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.control_bf"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.control_bf" title="Permalink to this definition">¶</a></dt>
-<dd><p>Point and track beamformers.
-num refers to the beamformer number (1 through 8).
-If track=True, target is treated as celestial coords or by target name
-If track=False, target is treated as (az, el)
-target can be:</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>source name (‘zenith’, ‘sun’) or</p></li>
-<li><p>tuple of (ra, dec) in (hourangle, degrees).</p></li>
-<li><p>tuple of (az, el) in degrees, if track=False</p></li>
-</ul>
-</div></blockquote>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.parse_config">
-<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">parse_config</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config_file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.parse_config"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.parse_config" title="Permalink to this definition">¶</a></dt>
-<dd><p>Parse yaml format config_file and return dict</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.set_arx">
-<span class="sig-name descname"><span class="pre">set_arx</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">preset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.set_arx"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.set_arx" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set ARX to preset config.
-Defaults to preset in configuration file.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.set_properties">
-<span class="sig-name descname"><span class="pre">set_properties</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.set_properties"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.set_properties" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set properties, then recalculate config properties.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.start_dr">
-<span class="sig-name descname"><span class="pre">start_dr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">recorders</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">duration</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.start_dr"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.start_dr" title="Permalink to this definition">¶</a></dt>
-<dd><p>Start data recorders listed recorders.
-Defaults to starting those listed in configuration file.
-duration is power beam recording in milliseconds.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.start_fengine">
-<span class="sig-name descname"><span class="pre">start_fengine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">initialize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">program</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">force</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.start_fengine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.start_fengine" title="Permalink to this definition">¶</a></dt>
-<dd><p>Start the fengines on all snap2s.
-Defaults to all listed in “snap2s_inuse” field of configuration file.
-Optionally can initialize and program.
-force will run cold_start method regardless of current state.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.status_dr">
-<span class="sig-name descname"><span class="pre">status_dr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">recorders</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.status_dr"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.status_dr" title="Permalink to this definition">¶</a></dt>
-<dd><p>Print data recorder info monitor point</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.status_fengine">
-<span class="sig-name descname"><span class="pre">status_fengine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">poll</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.status_fengine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.status_fengine" title="Permalink to this definition">¶</a></dt>
-<dd><p>Use snap2 etcd client to poll for stats on each fengine.
-poll of True will refresh the fengine statistics.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.status_xengine">
-<span class="sig-name descname"><span class="pre">status_xengine</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.status_xengine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.status_xengine" title="Permalink to this definition">¶</a></dt>
-<dd><p>to be implemented for more detailed monitor point info</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.stop_dr">
-<span class="sig-name descname"><span class="pre">stop_dr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">recorders</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.stop_dr"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.stop_dr" title="Permalink to this definition">¶</a></dt>
-<dd><p>Stop data recorders in list recorders.
-Defaults to stopping those listed in configuration file.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.control.Controller.stop_xengine">
-<span class="sig-name descname"><span class="pre">stop_xengine</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/control.html#Controller.stop_xengine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.control.Controller.stop_xengine" title="Permalink to this definition">¶</a></dt>
-<dd><p>Stop xengines listed in configuration file.</p>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="mnc.xengine_beamformer_control.BeamPointingControl">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mnc.xengine_beamformer_control.</span></span><span class="sig-name descname"><span class="pre">BeamPointingControl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">beam</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">servers=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nserver=8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">npipeline_per_server=4</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">station=Station</span> <span class="pre">OVRO_MMA</span> <span class="pre">with</span> <span class="pre">352</span> <span class="pre">antennas</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">etcdhost='etcdv3service'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/xengine_beamformer_control.html#BeamPointingControl"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.xengine_beamformer_control.BeamPointingControl" title="Permalink to this definition">¶</a></dt>
-<dd><p>Class to provide high level control over a beam.</p>
-<dl class="py property">
-<dt class="sig sig-object py" id="mnc.xengine_beamformer_control.BeamPointingControl.cal_set">
-<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">cal_set</span></span><a class="headerlink" href="#mnc.xengine_beamformer_control.BeamPointingControl.cal_set" title="Permalink to this definition">¶</a></dt>
-<dd><p>Boolean as to whether or not all pipelines have had a calibration set.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.xengine_beamformer_control.BeamPointingControl.set_beam_calibration">
-<span class="sig-name descname"><span class="pre">set_beam_calibration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">caltable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/xengine_beamformer_control.html#BeamPointingControl.set_beam_calibration"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.xengine_beamformer_control.BeamPointingControl.set_beam_calibration" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a a CASA measurement set containing a bandpass calibration, load
-the bandpass calibration into the appropriate pipeline(s).</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.xengine_beamformer_control.BeamPointingControl.set_beam_delays">
-<span class="sig-name descname"><span class="pre">set_beam_delays</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">delays</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">load_time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/xengine_beamformer_control.html#BeamPointingControl.set_beam_delays"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.xengine_beamformer_control.BeamPointingControl.set_beam_delays" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the beamformer delays to the specified values in ns for the given
-polarization.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.xengine_beamformer_control.BeamPointingControl.set_beam_dest">
-<span class="sig-name descname"><span class="pre">set_beam_dest</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">addr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">port</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">addr_base</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'10.41.0.76'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">port_base</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">20001</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/xengine_beamformer_control.html#BeamPointingControl.set_beam_dest"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.xengine_beamformer_control.BeamPointingControl.set_beam_dest" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the destination IP address and UDP port for the beam data.  Defaults
-to what is currently used by the “dr-beam-N” services on lxdlwagpu09.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.xengine_beamformer_control.BeamPointingControl.set_beam_gain">
-<span class="sig-name descname"><span class="pre">set_beam_gain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gain</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/xengine_beamformer_control.html#BeamPointingControl.set_beam_gain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.xengine_beamformer_control.BeamPointingControl.set_beam_gain" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the “gain” for beam 1 - this is a multiplicative scalar used during
-beamforming.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>A change to the gain can only activated by an update to the
-pointing direction.</p>
-</div>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.xengine_beamformer_control.BeamPointingControl.set_beam_pointing">
-<span class="sig-name descname"><span class="pre">set_beam_pointing</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">az</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degrees</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">load_time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/xengine_beamformer_control.html#BeamPointingControl.set_beam_pointing"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.xengine_beamformer_control.BeamPointingControl.set_beam_pointing" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a topocentric pointing in azimuth and altitude (elevation), point
-the beam in that direction.  The <cite>degrees</cite> keyword determines if the
-coordinates are interpreted in degrees (True) or radians (False).</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.xengine_beamformer_control.BeamPointingControl.set_beam_target">
-<span class="sig-name descname"><span class="pre">set_beam_target</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">target_or_ra</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dec</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">load_time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/xengine_beamformer_control.html#BeamPointingControl.set_beam_target"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.xengine_beamformer_control.BeamPointingControl.set_beam_target" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given the name of an astronomical target, ‘sun’, or ‘zenith’, compute the
-current topocentric position of the body and point the beam at it.  If
-the ‘dec’ keyword is not None, the target is intepreted to be a RA.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.xengine_beamformer_control.BeamPointingControl.set_beam_vlbi_dest">
-<span class="sig-name descname"><span class="pre">set_beam_vlbi_dest</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">addr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'10.41.0.73'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">port</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">21001</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/xengine_beamformer_control.html#BeamPointingControl.set_beam_vlbi_dest"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.xengine_beamformer_control.BeamPointingControl.set_beam_vlbi_dest" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the destination IP address and UDP port for the VLBI version of the
-beam data.  Defaults to what is currently used by the “dr-tengine”
-service on lxdlwagpu09.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="mnc.xengine_beamformer_control.BeamPointingControl.set_beam_weighting">
-<span class="sig-name descname"><span class="pre">set_beam_weighting</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fnc=&lt;function</span> <span class="pre">BeamPointingControl.&lt;lambda&gt;&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/xengine_beamformer_control.html#BeamPointingControl.set_beam_weighting"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.xengine_beamformer_control.BeamPointingControl.set_beam_weighting" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the beamformer antenna weighting using the provided function.  The
-function should accept a single floating point input of an antenna’s
-distance from the array center (in meters) and return a weight between
-0 and 1, inclusive.</p>
-</dd></dl>
-
-</dd></dl>
-
+<h1>mnc_python class API<a class="headerlink" href="#mnc-python-class-api" title="Permalink to this heading">¶</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="mnc.mcs.Client">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">mnc.mcs.</span></span><span class="sig-name descname"><span class="pre">Client</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mnc/mcs.html#Client"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mnc.mcs.Client" title="Permalink to this definition">¶</a></dt>
@@ -358,7 +178,10 @@ write was successful, False otherwise.</p>
 <h3>Navigation</h3>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="ExampleObs.html">Example Observations with OVRO-LWA</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">mnc_python class API</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">mnc_python class API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#mnc.mcs.Client"><code class="docutils literal notranslate"><span class="pre">Client</span></code></a></li>
+</ul>
+</li>
 </ul>
 
 <div class="relations">
@@ -378,7 +201,7 @@ write was successful, False otherwise.</p>
     </form>
     </div>
 </div>
-<script>$('#searchbox').show(0);</script>
+<script>document.getElementById('searchbox').style.display = "block"</script>
 
 
 
@@ -395,8 +218,8 @@ write was successful, False otherwise.</p>
       &copy;2022, Casey Law.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.5.0</a>
-      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 6.1.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
       
       |
       <a href="_sources/api.rst.txt"
