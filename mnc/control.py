@@ -395,7 +395,7 @@ class Controller():
             recorders = [recorders,]
 
         # set start time arguments
-        if isinstance(t0, str) and t0 == 'now'
+        if isinstance(t0, str) and t0 == 'now':
             mjd = mpm = t0
             start = Time.now()
         else:
