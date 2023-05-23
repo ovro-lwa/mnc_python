@@ -395,8 +395,7 @@ class Controller():
             recorders = [recorders,]
 
         # set start time arguments
-        if isinstance(t0, str):
-            assert t0 == 'now'
+        if isinstance(t0, str) and t0 == 'now'
             mjd = mpm = t0
             start = Time.now()
         else:
@@ -413,7 +412,7 @@ class Controller():
             mpm = int(mjd_dt * 24 * 3600 * 1e3)
                 
         # start ms writing
-        logger.info(f"Starting recorders: {recorders}")
+        logger.info(f"Starting recorders {recorders} at {start.mjd} (currently {Time.now().mjd})")
         for recorder in recorders:
             accepted = False
 
