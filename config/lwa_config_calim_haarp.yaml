@@ -1,0 +1,220 @@
+# configuration of etcd server for monitor and control
+#
+# This configuration interleaves frequency channels across physical nodes
+# such that both the lower and upper halves of the frequency band are spread over
+# 8 servers (and 16 pipelines)
+
+etcd:
+    host: "etcdv3service"  # standard service location
+    #host: "lxdlwacr"  # temporary service location
+    port: "2379"
+
+# configuration of ARX
+arx:
+    adrs: [11, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45]
+    preset: 1  # preset of 0, 1, 2 are supported. each intended for specific scenarios
+
+# configuration of F-engines running on SNAP2s
+fengines:
+    snap2s_inuse: ["snap01", "snap02", "snap03", "snap04", "snap05", "snap06", "snap07", "snap08", "snap09", "snap10", "snap11"]
+    fft_shift: 2047
+    chans_per_packet: 96
+    snap01:
+        ants: [0, 32]
+        gbe: '10.41.0.101'
+        source_port: 10000
+    snap02:
+        ants: [32, 64]
+        gbe: '10.41.0.102'
+        source_port: 10000
+    snap03:
+        ants: [64, 96]
+        gbe: '10.41.0.103'
+        source_port: 10000
+    snap04:
+        ants: [96, 128]
+        gbe: '10.41.0.104'
+        source_port: 10000
+    snap05:
+        ants: [128, 160]
+        gbe: '10.41.0.105'
+        source_port: 10000
+    snap06:
+        ants: [160, 192]
+        gbe: '10.41.0.106'
+        source_port: 10000
+    snap07:
+        ants: [192, 224]
+        gbe: '10.41.0.107'
+        source_port: 10000
+    snap08:
+        ants: [224, 256]
+        gbe: '10.41.0.108'
+        source_port: 10000
+    snap09:
+        ants: [256, 288]
+        gbe: '10.41.0.109'
+        source_port: 10000
+    snap10:
+        ants: [288, 320]
+        gbe: '10.41.0.110'
+        source_port: 10000
+    snap11:
+        ants: [320, 352]
+        gbe: '10.41.0.111'
+        source_port: 10000
+
+# configuration of x-engines (correlator beamformers) running on GPUs
+xengines:
+  xhosts: ["lxdlwagpu01", "lxdlwagpu02", "lxdlwagpu03", "lxdlwagpu04", "lxdlwagpu05", "lxdlwagpu06", "lxdlwagpu07", "lxdlwagpu08"]
+  nxpipeline: 4
+  arp:
+    # lwa-gpu01
+    10.41.0.65: 0x043f72d0b112
+    10.41.0.18: 0x043f72d0b10e
+    # lwa-gpu02
+    10.41.0.66: 0x043f72d0b106
+    10.41.0.17: 0x043f72d0b116
+    # lwa-gpu03
+    10.41.0.67: 0x043f72d0b0e2
+    10.41.0.19: 0x043f72d0b0f6
+    # lwa-gpu04
+    10.41.0.68: 0x043f72dfc1f4
+    10.41.0.20: 0x043f72ab3750
+    # lwa-gpu05
+    10.41.0.69: 0x043f72dfc2e4
+    10.41.0.21: 0x043f72dfc2a0
+    # lwa-gpu06
+    10.41.0.70: 0x043f72dfc1d4
+    10.41.0.22: 0x043f72dfc2e8
+    # lwa-gpu07
+    10.41.0.71: 0x043f72dfc308
+    10.41.0.23: 0x043f72dfc2d8
+    # lwa-gpu08
+    10.41.0.72: 0x043f72dfc300
+    10.41.0.24: 0x043f72dfc2a8
+  chans:
+    # lwa-gpu01
+    10.41.0.65-10000: [ 272,  368]
+    10.41.0.18-10000: [ 368,  464]
+    10.41.0.65-20000: [2096, 2192]
+    10.41.0.18-20000: [2192, 2288]
+    # lwa-gpu02
+    10.41.0.66-10000: [ 752, 848]
+    10.41.0.17-10000: [ 848, 944]
+    10.41.0.66-20000: [2288, 2384]
+    10.41.0.17-20000: [2384, 2480]
+    # lwa-gpu03
+    10.41.0.67-10000: [ 944, 1040]
+    10.41.0.19-10000: [1040, 1136]
+    10.41.0.67-20000: [2480, 2576]
+    10.41.0.19-20000: [2576, 2672]
+    # lwa-gpu04
+    10.41.0.68-10000: [1136, 1232]
+    10.41.0.20-10000: [1232, 1328]
+    10.41.0.68-20000: [2672, 2768]
+    10.41.0.20-20000: [2768, 2864]
+    # lwa-gpu05
+    10.41.0.69-10000: [1328, 1424]
+    10.41.0.21-10000: [1424, 1520]
+    10.41.0.69-20000: [2864, 2960]
+    10.41.0.21-20000: [2960, 3056]
+    # lwa-gpu06
+    10.41.0.70-10000: [1520, 1616]
+    10.41.0.22-10000: [1616, 1712]
+    10.41.0.70-20000: [3056, 3152]
+    10.41.0.22-20000: [3152, 3248]
+    # lwa-gpu07
+    10.41.0.71-10000: [1712, 1808]
+    10.41.0.23-10000: [1808, 1904]
+    10.41.0.71-20000: [3248, 3344]
+    10.41.0.23-20000: [3344, 3440]
+    # lwa-gpu08
+    10.41.0.72-10000: [1904, 2000]
+    10.41.0.24-10000: [2000, 2096]
+    10.41.0.72-20000: [3440, 3536]
+    10.41.0.24-20000: [3536, 3632]
+
+  x_dest_corr_name:    # where gpu servers send data (usually maps one-to-one from gpu to calim node)
+    lxdlwagpu01: lwacalim01
+    lxdlwagpu02: lwacalim02
+    lxdlwagpu03: lwacalim03
+    lxdlwagpu04: lwacalim04
+    lxdlwagpu05: lwacalim05
+    lxdlwagpu06: lwacalim06
+    lxdlwagpu07: lwacalim07
+    lxdlwagpu08: lwacalim08
+  x_dest_corr_slow_port: [10001, 10001, 10002, 10002]
+  x_dest_corr_fast_port: [11001, 11001, 11002, 11002]
+  x_dest_beam_ip: ["10.41.0.76", "10.41.0.76", "10.41.0.77", "10.41.0.77", "10.41.0.78", "10.41.0.78", "10.41.0.79", "10.41.0.79"]
+  x_dest_beam_port: [20001, 20002, 20001, 20002, 20001, 20002, 20001, 20002]
+  cal_directory: "/home/pipeline/caltables/latest/"   # location on destination server of calibration tables
+  update_interval: 15  # beamformer tracking update cadence in seconds
+  # Which antennas to output in the fast dump stream
+  fast_vis_ants:
+    - LWA-007
+    - LWA-021
+    - LWA-025
+    - LWA-029
+    - LWA-033
+    - LWA-063
+    - LWA-064
+    - LWA-065
+    - LWA-096
+    - LWA-097
+    - LWA-129
+    - LWA-160
+    - LWA-161
+    - LWA-193
+    - LWA-195
+    - LWA-223
+    - LWA-225
+    - LWA-226
+    - LWA-245
+    - LWA-252
+    - LWA-253
+    - LWA-254
+    - LWA-255
+    - LWA-256
+    - LWA-275
+    - LWA-279
+    - LWA-286
+    - LWA-287
+    - LWA-290
+    - LWA-293
+    - LWA-316
+    - LWA-322
+    - LWA-325
+    - LWA-326
+    - LWA-328
+    - LWA-329
+    - LWA-333
+    - LWA-334
+    - LWA-345
+    - LWA-347
+    - LWA-348
+    - LWA-353
+    - LWA-355
+    - LWA-357
+    - LWA-358
+    - LWA-359
+    - LWA-361
+    - LWA-363
+
+# IP address of each data recorder server (used by x-eng control)
+drip_mapping:
+  lwacalim00: "10.41.0.75"
+  lwacalim01: "10.41.0.76"
+  lwacalim02: "10.41.0.77"
+  lwacalim03: "10.41.0.78"
+  lwacalim04: "10.41.0.79"
+  lwacalim05: "10.41.0.80"
+  lwacalim06: "10.41.0.81"
+  lwacalim07: "10.41.0.82"
+  lwacalim08: "10.41.0.83"
+  lwacalim09: "10.41.0.84"
+  lwacalim10: "10.41.0.85"
+
+# Data recorder configuration
+dr:
+        recorders: ['drvs', 'drvf', 'dr1', 'dr2', 'dr3', 'dr4']  # Supported modes "drvs" (slow vis), "drvf" (fast vis), "dr1" up to 8 (power beam)
