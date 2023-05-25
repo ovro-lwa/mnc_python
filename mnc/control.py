@@ -306,11 +306,12 @@ class Controller():
 
 
     def control_bf(self, num=1, coord=None, coordtype='celestial', targetname=None,
-                   track=True):
+                   track=True, beam_gain=None):
         """ Point and track beamformers.
         num refers to the beamformer number (1 through 8).
         If track=True, target is treated as celestial coords or by target name
         If track=False, target is treated as (az, el)
+        beam_gain optionally specifies the gain for the beam.
         target can be:
          - source name ('zenith', 'sun') or
          - tuple of (ra, dec) in (hourangle, degrees).
@@ -334,6 +335,8 @@ class Controller():
             logger.error(msg)
             raise KeyError(msg)
 
+        if beam_gain:
+            self.bfc[num].set_beam_gain(beam_gain)
         if targetname is not None:
             self.bfc[num].set_beam_target(targetname)
         elif ra is not None:
