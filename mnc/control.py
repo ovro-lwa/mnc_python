@@ -114,6 +114,7 @@ class Controller():
         p = Lwa352CorrelatorControl(self.xhosts, npipeline_per_host=self.npipeline, etcdhost=self.etcdhost, log=logger.getChild('Lwa352CorrelatorControl'))
         self.pcontroller = p
         self.pipelines = p.pipelines
+        self.xhosts_up = sorted(set([p.host for p in self.pipelines]))
 
         # data recorder control client
         self.drvnums = [ip[-2:]+str(port)[-2:] for (ip, port) in zip(self.x_dest_corr_ip,
@@ -216,7 +217,6 @@ class Controller():
             recorders = dconf['recorders']
         elif not isinstance(recorders, (list, tuple)):
             recorders = [recorders,]
-
         
         xconf = self.conf['xengines']
 
@@ -287,10 +287,10 @@ class Controller():
                 continue
 
             num = int(recorder[2:])
-            logger.info(f"Configuring x-engine for beam {num}")
+            logger.info(f"Configuring x-engine for beam {num} on xhosts {self.xhosts_up}")
             try:
-                self.bfc[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts,
-                                                                                nserver=len(self.xhosts),
+                self.bfc[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts_up,
+                                                                                nserver=len(self.xhosts_up),
                                                                                 npipeline_per_server=self.npipeline,
                                                                                 cal_directory=cal_directory,
                                                                                 etcdhost=self.etcdhost)

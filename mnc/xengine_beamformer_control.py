@@ -550,10 +550,13 @@ def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4, 
                                            etcdhost=etcdhost)
     
     # Find the calibration files
-    calfiles = glob.glob(os.path.join(cal_directory, '*.bcal'))
-    calfiles.sort()
-    if len(calfiles) == 0:
-        logger.warn(f"No calibration data found in '{cal_directory}'")
+    if cal_directory == '/pathshouldnotexist':
+        calfiles = []
+    else:
+        calfiles = glob.glob(os.path.join(cal_directory, '*.bcal'))
+        calfiles.sort()
+        if len(calfiles) == 0:
+            logger.warn(f"No calibration data found in '{cal_directory}'")
         
     # Load the calibration data, if found
     for calfile in calfiles:
