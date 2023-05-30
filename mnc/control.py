@@ -306,12 +306,13 @@ class Controller():
 
 
     def control_bf(self, num=1, coord=None, coordtype='celestial', targetname=None,
-                   track=True, beam_gain=None):
+                   track=True, beam_gain=None, duration=0):
         """ Point and track beamformers.
         num refers to the beamformer number (1 through 8).
         If track=True, target is treated as celestial coords or by target name
         If track=False, target is treated as (az, el)
         beam_gain optionally specifies the gain for the beam.
+        duration is time to track in seconds (0 means 12 hrs).
         target can be:
          - source name ('zenith', 'sun') or
          - tuple of (ra, dec) in (hourangle, degrees).
@@ -351,9 +352,9 @@ class Controller():
         if track:
             t = xengine_beamformer_control.BeamTracker(self.bfc[num], update_interval=self.conf['xengines']['update_interval'])
             if targetname is not None:
-                t.track(targetname)
+                t.track(targetname, duration=duration)
             elif ra is not None:
-                t.track(ra, dec=dec)
+                t.track(ra, dec=dec, duration=duration)
             else:
                 logging.info(f'Beam {num}: Not tracking for azel input')
         else:
