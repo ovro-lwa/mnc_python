@@ -477,11 +477,11 @@ class Controller():
 
         return statuses
 
-    def stop_dr(self, recorders=None, t0='now', queue_number=1):
+    def stop_dr(self, recorders=None, t0='now', queue_number=0):
         """ Stop data recorders in list recorders.
         Defaults to stopping those listed in configuration file.
         t0 is stop time (astropy Time object, mjd, or isot format supported).
-        queue_number is index of queued beamformer observations (default stops most recent == 1).
+        queue_number is index of queued beamformer observations (default stops most recent == 0).
         """
 
         dconf = self.conf['dr']
