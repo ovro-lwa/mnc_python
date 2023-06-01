@@ -63,6 +63,8 @@ class Controller():
                 modes.append(f"beam{b}")
         logger.info(f"Loaded configuration for {self.nhosts} x-engine host(s) running {self.npipeline} pipeline(s) each")
         logger.info(f"Supported recorder modes are: {','.join(modes)}")
+        if 'beam2' in modes or 'beam3' in modes:
+            logger.info("\t Note: beams 2 (Solar) and 3 (FRB) are reserved for specific science applications. Check with those teams before using them.")
         logger.info(f"etcd server being used is: {self.etcdhost}")
 
     @staticmethod
@@ -205,7 +207,7 @@ class Controller():
 
         return timestamp, stats
 
-    def configure_xengine(self, recorders=None, calibratebeams=False, full=True):
+    def configure_xengine(self, recorders=None, calibratebeams=False, full=False):
         """ Restart xengine. Configure pipelines to send data to recorders.
         Recorders is list of recorders to configure output to. Defaults to those in config file.
         Supported recorders are "drvs" (slow vis), "drvf" (fast vis), "dr[n]" (power beams)

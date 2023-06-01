@@ -217,4 +217,4 @@ drip_mapping:
 
 # Data recorder configuration
 dr:
-        recorders: ['drvs', 'drvf', 'dr1', 'dr2', 'dr3', 'dr4']  # Supported modes "drvs" (slow vis), "drvf" (fast vis), "dr1" up to 8 (power beam)
+        recorders: ['drvs', 'drvf', 'dr1']  # Supported modes "drvs" (slow vis), "drvf" (fast vis), "dr1" up to 8 (power beam)
