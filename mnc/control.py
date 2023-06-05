@@ -26,7 +26,7 @@ from mnc import mcs, xengine_beamformer_control
 
 
 CONFIG_FILE = '/home/pipeline/proj/lwa-shell/mnc_python/config/lwa_config_calim.yaml'
-
+FPG_FILE = '/home/ubuntu/proj/lwa-shell/caltech-lwa/snap2_f_200msps_64i_4096c/outputs/snap2_f_200msps_64i_4096c.fpg'
 
 class Controller():
     """ Parse configuration and control all subsystems in uniform manner.
@@ -156,7 +156,7 @@ class Controller():
         if initialize or program:
             if snap2names == fconf['snap2s_inuse']:
                 if (not all(is_programmed.values()) or force) and program:
-                    ec.send_command(0, 'feng', 'program', timeout=60*7, n_response_expected=11)
+                    ec.send_command(0, 'feng', 'program', timeout=60*7, n_response_expected=11, kwargs={'fpgfile': FPG_FILE})
                     ec.send_command(0, 'feng', 'initialize', kwargs={'read_only':False}, timeout=60*5, n_response_expected=11)
                 else:
                     logger.info('All snaps already programmed.')
