@@ -207,7 +207,7 @@ class Controller():
 
         return timestamp, stats
 
-    def configure_xengine(self, recorders=None, calibratebeams=False, full=False, timeout=120):
+    def configure_xengine(self, recorders=None, calibratebeams=False, full=False, timeout=300):
         """ Restart xengine. Configure pipelines to send data to recorders.
         Recorders is list of recorders to configure output to. Defaults to those in config file.
         Supported recorders are "drvs" (slow vis), "drvf" (fast vis), "dr[n]" (power beams)
