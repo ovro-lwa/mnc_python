@@ -26,7 +26,7 @@ from mnc import mcs, xengine_beamformer_control
 
 
 CONFIG_FILE = '/home/pipeline/proj/lwa-shell/mnc_python/config/lwa_config_calim.yaml'
-
+FPG_FILE = '/home/ubuntu/proj/lwa-shell/caltech-lwa/snap2_f_200msps_64i_4096c/outputs/snap2_f_200msps_64i_4096c.fpg'
 
 class Controller():
     """ Parse configuration and control all subsystems in uniform manner.
@@ -63,6 +63,8 @@ class Controller():
                 modes.append(f"beam{b}")
         logger.info(f"Loaded configuration for {self.nhosts} x-engine host(s) running {self.npipeline} pipeline(s) each")
         logger.info(f"Supported recorder modes are: {','.join(modes)}")
+        if 'beam2' in modes or 'beam3' in modes:
+            logger.info("\t Note: beams 2 (Solar) and 3 (FRB) are reserved for specific science applications. Check with those teams before using them.")
         logger.info(f"etcd server being used is: {self.etcdhost}")
 
     @staticmethod
@@ -154,7 +156,7 @@ class Controller():
         if initialize or program:
             if snap2names == fconf['snap2s_inuse']:
                 if (not all(is_programmed.values()) or force) and program:
-                    ec.send_command(0, 'feng', 'program', timeout=60*7, n_response_expected=11)
+                    ec.send_command(0, 'feng', 'program', timeout=60*7, n_response_expected=11, kwargs={'fpgfile': FPG_FILE})
                     ec.send_command(0, 'feng', 'initialize', kwargs={'read_only':False}, timeout=60*5, n_response_expected=11)
                 else:
                     logger.info('All snaps already programmed.')
@@ -205,11 +207,12 @@ class Controller():
 
         return timestamp, stats
 
-    def configure_xengine(self, recorders=None, calibratebeams=False, full=True):
+    def configure_xengine(self, recorders=None, calibratebeams=False, full=False, timeout=300):
         """ Restart xengine. Configure pipelines to send data to recorders.
         Recorders is list of recorders to configure output to. Defaults to those in config file.
         Supported recorders are "drvs" (slow vis), "drvf" (fast vis), "dr[n]" (power beams)
         Option "full" will stop/start/clear pipelines/beamformer controllers.
+        timeout is for x-engine start_pipelines method.
         """
 
         dconf = self.conf['dr']
@@ -224,7 +227,7 @@ class Controller():
             logger.info("Stopping/starting pipelines")
             # stop before starting
             self.pcontroller.stop_pipelines()   
-            self.pcontroller.start_pipelines() 
+            self.pcontroller.start_pipelines(timeout=timeout)
 
             # Clear the beamformer state
             self.bfc.clear()
