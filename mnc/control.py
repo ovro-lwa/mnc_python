@@ -224,9 +224,10 @@ class Controller():
         xconf = self.conf['xengines']
 
         if full:
-            logger.info("Stopping/starting pipelines")
+            logger.info("Stopping/starting pipelines with 20s sleep")
             # stop before starting
-            self.pcontroller.stop_pipelines()   
+            self.pcontroller.stop_pipelines()
+            time.sleep(20)
             self.pcontroller.start_pipelines(timeout=timeout)
 
             # Clear the beamformer state
