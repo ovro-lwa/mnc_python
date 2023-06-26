@@ -220,65 +220,19 @@ class Controller():
             recorders = dconf['recorders']
         elif not isinstance(recorders, (list, tuple)):
             recorders = [recorders,]
-        
-        xconf = self.conf['xengines']
 
         if full:
             logger.info("Stopping/starting pipelines with 20s sleep")
             # stop before starting
             self.pcontroller.stop_pipelines()
             time.sleep(20)
-            self.pcontroller.start_pipelines(timeout=timeout)
-
+            self.start_xengine(timeout=timeout)
             # Clear the beamformer state
             self.bfc.clear()
 
         logger.info(f'pipelines up? {self.pcontroller.pipelines_are_up()}')
-
-        # slow
-        if 'drvs' in recorders or 'drvf' in recorders:
-            logger.info("Configuring x-engine for visibilities")
-            try:
-                self.pcontroller.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_slow_port)  # iterates over all slow corr outputs
-            except KeyError:
-                logger.error("KeyError when configuring correlator. Are data being sent from f to x-engines?")
-
-        else:
-            logger.info("Not configuring x-engine for visibilities")            
-
-        if 'drvf' in recorders:
-            fast_antnames = xconf.get('fast_vis_ants', [])
-
-            if len(fast_antnames):
-                logger.info("Selecting antennas for fast visibilities.")
-            elif len(fast_antnames) == 0:
-                logger.warning("No antennas selected for fast visibilities")
-
-            # Empty array for visibility selection indices
-            fast_vis_out = np.zeros([self.pcontroller.pipelines[0].corr_subsel.nvis_out, 2, 2], dtype=int)
-            # "LWA-007"-style antenna names for fast visibilities
-            fast_corrids = []
-            for antname in fast_antnames:
-                try:
-                    fast_corrids += [mapping.antname_to_correlator(antname)]
-                except KeyError:
-                    logger.error(f'Couldn\'t convert antenna {antname} to a correlator index')
-                    logger.info('Continuing without this antenna')
-            # Construct list of all baselines (including autos) for antennas in the list
-            fast_vis_n = 0
-            for corridn_a, corrid_a in enumerate(fast_corrids):
-                for corridn_b, corrid_b in enumerate(fast_corrids[corridn_a:]):
-                    # Add all 4 polarization products
-                    fast_vis_out[fast_vis_n+0] = [[corrid_a, 0], [corrid_b, 0]]
-                    fast_vis_out[fast_vis_n+1] = [[corrid_a, 0], [corrid_b, 1]]
-                    fast_vis_out[fast_vis_n+2] = [[corrid_a, 1], [corrid_b, 1]]
-                    fast_vis_out[fast_vis_n+3] = [[corrid_a, 1], [corrid_b, 0]]
-                    fast_vis_n += 4
-            for i in range(self.npipeline*self.nhosts):
-                self.pcontroller.pipelines[i].corr_subsel.set_baseline_select(fast_vis_out)
-                self.pcontroller.pipelines[i].corr_output_part.set_destination(self.x_dest_corr_ip[i], self.x_dest_corr_fast_port[i%4])
-        else:
-            logger.info("Not configuring x-engine for fast visibilities")            
+        if not self.pcontroller.pipelines_are_up():
+            raise RuntimeError("X engine is not up. Consider restarting xengine with full=True.")
 
         if calibratebeams:
             cal_directory = self.conf['xengines']['cal_directory']
@@ -308,6 +262,11 @@ class Controller():
                 port = self.conf['xengines']['x_dest_beam_port']
                 self.bfc[num].set_beam_dest(addr=addr[num-1], port=port[num-1])
 
+        # slow
+        if 'drvs' in recorders or 'drvf' in recorders:
+            logger.warn('fast and slow vis are already configured by default. '
+                        'If you changed data destination or antenna selection,'
+                        'you need to restart the X engine with full=True.')
 
     def control_bf(self, num=1, coord=None, coordtype='celestial', targetname=None,
                    track=True, beam_gain=None, duration=0):
@@ -380,6 +339,54 @@ class Controller():
                              str(bool(alive)),
                              f"{capture_status['gbps']:.1f}",
                              f"{corr_status['gbps']:.1f}"))
+
+    def start_xengine(self, timeout):
+        if self.pcontroller.pipelines_are_up():
+            msg = 'Pipelines are running. Please stop the xengine first.'
+            logger.error(msg)
+            raise RuntimeError(msg)
+
+        logger.info('Starting Xengine and configuring for visibilities.')
+        self.pcontroller.start_pipelines(timeout=timeout)
+        try:
+            self.pcontroller.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_slow_port)  # iterates over all slow corr outputs
+        except KeyError:
+            msg = "KeyError when configuring correlator. Are data being sent from f to x-engines?"
+            logger.error(msg)
+            raise RuntimeError(msg)
+
+        xconf = self.conf['xengines']
+        fast_antnames = xconf.get('fast_vis_ants', [])
+
+        if len(fast_antnames):
+            logger.info("Selecting antennas for fast visibilities.")
+        elif len(fast_antnames) == 0:
+            logger.warning("No antennas selected for fast visibilities")
+            return
+
+        # Empty array for visibility selection indices
+        fast_vis_out = np.zeros([self.pcontroller.pipelines[0].corr_subsel.nvis_out, 2, 2], dtype=int)
+        # "LWA-007"-style antenna names for fast visibilities
+        fast_corrids = []
+        for antname in fast_antnames:
+            try:
+                fast_corrids += [mapping.antname_to_correlator(antname)]
+            except KeyError:
+                logger.error(f'Couldn\'t convert antenna {antname} to a correlator index')
+                logger.info('Continuing without this antenna')
+        # Construct list of all baselines (including autos) for antennas in the list
+        fast_vis_n = 0
+        for corridn_a, corrid_a in enumerate(fast_corrids):
+            for corridn_b, corrid_b in enumerate(fast_corrids[corridn_a:]):
+                # Add all 4 polarization products
+                fast_vis_out[fast_vis_n+0] = [[corrid_a, 0], [corrid_b, 0]]
+                fast_vis_out[fast_vis_n+1] = [[corrid_a, 0], [corrid_b, 1]]
+                fast_vis_out[fast_vis_n+2] = [[corrid_a, 1], [corrid_b, 1]]
+                fast_vis_out[fast_vis_n+3] = [[corrid_a, 1], [corrid_b, 0]]
+                fast_vis_n += 4
+        for i in range(self.npipeline*self.nhosts):
+            self.pcontroller.pipelines[i].corr_subsel.set_baseline_select(fast_vis_out)
+            self.pcontroller.pipelines[i].corr_output_part.set_destination(self.x_dest_corr_ip[i], self.x_dest_corr_fast_port[i%4])
 
     def stop_xengine(self):
         """ Stop xengines listed in configuration file.
