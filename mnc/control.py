@@ -340,7 +340,7 @@ class Controller():
                              f"{capture_status['gbps']:.1f}",
                              f"{corr_status['gbps']:.1f}"))
 
-    def start_xengine(self, timeout):
+    def start_xengine(self, timeout=300):
         if self.pcontroller.pipelines_are_up():
             msg = 'Pipelines are running. Please stop the xengine first.'
             logger.error(msg)
