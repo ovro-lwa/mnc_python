@@ -1,6 +1,7 @@
 import os.path
 import yaml
 import logging
+from typing import Union, Callable, List
 import glob
 import numpy as np
 import glob
@@ -27,6 +28,8 @@ from mnc import mcs, xengine_beamformer_control
 
 CONFIG_FILE = '/home/pipeline/proj/lwa-shell/mnc_python/config/lwa_config_calim.yaml'
 FPG_FILE = '/home/ubuntu/proj/lwa-shell/caltech-lwa/snap2_f_200msps_64i_4096c/outputs/snap2_f_200msps_64i_4096c.fpg'
+
+CORE_RADIUS_M = 200.0
 
 class Controller():
     """ Parse configuration and control all subsystems in uniform manner.
@@ -310,12 +313,14 @@ class Controller():
 
 
     def control_bf(self, num=1, coord=None, coordtype='celestial', targetname=None,
-                   track=True, beam_gain=None, duration=0):
+                   track=True, weight: Union[str, Callable[[float], float]]='core',
+                   beam_gain=None, duration=0):
         """ Point and track beamformers.
         num refers to the beamformer number (1 through 8).
         If track=True, target is treated as celestial coords or by target name
         If track=False, target is treated as (az, el)
-        beam_gain optionally specifies the gain for the beam.
+        weight can be: 'core', 'natural', a single antenna name, or a function (see xengine_beamformer_control.set_beam_weights)
+        beam_gain optionally specifies the amplitude scaling for the beam.
         duration is time to track in seconds (0 means 12 hrs).
         target can be:
          - source name ('zenith', 'sun') or
@@ -339,6 +344,18 @@ class Controller():
             msg = "Xengine not configured for beam {num}"
             logger.error(msg)
             raise KeyError(msg)
+
+        if (callable(weight)):
+            assert weight.__code__.co_argcount == 1, "weight function must only take one argument"
+            self.bfc[num].set_beam_weighting(weight)
+        elif (weight == 'core'):
+            self.bfc[num].set_beam_weighting(_core_weight_func)
+        elif (weight == 'natural'):
+            pass
+        elif weight.startswith('LWA-'):
+            self.bfc[num].set_beam_weighting(flag_ants=_single_ant_flags_list(weight))
+        else:
+            raise ValueError(f'Invalid value for weight {weight}')
 
         if beam_gain:
             self.bfc[num].set_beam_gain(beam_gain)
@@ -533,4 +550,3 @@ def _single_ant_flags_list(antname: str) -> List[int]:
     flag_list = list(range(352))
     flag_list.remove(mapping.antname_to_correlator(antname))
     return flag_list
-

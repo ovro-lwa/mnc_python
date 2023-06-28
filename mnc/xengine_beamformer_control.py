@@ -9,6 +9,7 @@ from threading import RLock
 from textwrap import fill as tw_fill
 from concurrent.futures import ThreadPoolExecutor, wait as thread_pool_wait
 import asyncio
+from typing import List
 
 from lwa352_pipeline_control import Lwa352PipelineControl
 from casacore import tables
@@ -309,16 +310,18 @@ class BeamPointingControl(object):
         assert(gain >= 0)
         self._gain = float(gain)
         
-    def set_beam_weighting(self, fnc=lambda x: 1.0):
+    def set_beam_weighting(self, fnc=lambda x: 1.0,
+                           flag_ants: List[int]=[]):
         """
         Set the beamformer antenna weighting using the provided function.  The
         function should accept a single floating point input of an antenna's
         distance from the array center (in meters) and return a weight between
         0 and 1, inclusive.
+        flagged_ants is a list of antenna (correlator) numbers to flag.
         """
         
         fnc2 = lambda x: numpy.clip(fnc(numpy.sqrt(x[0]**2 + x[1]**2)), 0, 1)
-        self._weighting = numpy.array([fnc2(ant.enz) for ant in self.station.antennas])
+        self._weighting = numpy.array([0. if corr_num in flag_ants else fnc2(ant.enz) for corr_num, ant in enumerate(self.station.antennas)])
         self._weighting = numpy.repeat(self._weighting, 2)
         
     def set_beam_delays(self, delays, pol=0, load_time=None):
