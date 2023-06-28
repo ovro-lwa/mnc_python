@@ -63,7 +63,7 @@ class Controller():
                 modes.append(f"beam{b}")
         logger.info(f"Loaded configuration for {self.nhosts} x-engine host(s) running {self.npipeline} pipeline(s) each")
         logger.info(f"Supported recorder modes are: {','.join(modes)}")
-        if 'beam2' in modes or 'beam3' in modes or or 'beam4' in modes:
+        if 'beam2' in modes or 'beam3' in modes or 'beam4' in modes:
             logger.info("\t Note: beams 2 (Solar), 3 (FRB), and 4 (Jovian) are reserved for specific science applications. Check with those teams before using them.")
         logger.info(f"etcd server being used is: {self.etcdhost}")
 
