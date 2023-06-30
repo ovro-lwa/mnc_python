@@ -417,9 +417,9 @@ class Client(object):
         for command in self._watchers:
             try:
                 self.client.cancel_watch(self._watchers[command][0])
+                self.client.close()
             except Exception:
                 pass
-        self.client.close()
         
     def _update_mon_manifest(self, name, drop=False):
         """
