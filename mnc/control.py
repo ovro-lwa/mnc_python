@@ -228,7 +228,7 @@ class Controller():
             logger.info("Stopping/starting pipelines with 20s sleep")
             # stop before starting
             self.pcontroller.stop_pipelines()
-            time.sleep(20)
+            self.stop_xengine()
             self.start_xengine(timeout=timeout)
             # Clear the beamformer state
             self.bfc.clear()
@@ -410,6 +410,7 @@ class Controller():
         """
 
         self.pcontroller.stop_pipelines()
+        time.sleep(20)
 
     def start_dr(self, recorders=None, t0='now', duration=None, time_avg=1):
         """ Start data recorders listed recorders.
