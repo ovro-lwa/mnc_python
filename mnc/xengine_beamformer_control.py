@@ -158,10 +158,10 @@ class BeamPointingControl(object):
         
         return all(self._cal_set)
         
-    def set_beam_dest(self, addr=None, port=None, addr_base='10.41.0.76', port_base=20001):
+    def set_beam_dest(self, addr=None, port=None, addr_base='10.41.0.97', port_base=20001):
         """
         Set the destination IP address and UDP port for the beam data.  Defaults
-        to what is currently used by the "dr-beam-N" services on lxdlwagpu09.
+        to what is currently used by the "dr-beam-N" services on lwateng.
         """
         
         # If an address is not explicitly provided, find what is should be using
