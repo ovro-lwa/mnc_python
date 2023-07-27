@@ -1,9 +1,4 @@
-from __future__ import division, print_function
-try:
-    range = xrange
-except NameError:
-    pass
-    
+
 import os
 import sys
 import json
@@ -13,10 +8,7 @@ import etcd3
 import base64
 import signal
 import warnings
-try:
-    from io import BytesIO
-except ImportError:
-    from StringIO import StringIO as BytesIO
+from io import BytesIO
 from datetime import datetime, timedelta
 from textwrap import fill as tw_fill
 
