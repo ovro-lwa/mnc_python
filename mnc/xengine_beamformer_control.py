@@ -37,6 +37,8 @@ NSERVER = NPIPELINE // NPIPELINE_SERVER
 NSTAND = 352
 NPOL = 2
 
+NINPUT_CAL_FOR_GOOD = int(NSTAND*NPOL*0.90)
+
 
 def _build_repr(name, attrs=[]):
     name = '.'.join(name.split('.')[-2:])
@@ -130,15 +132,22 @@ class BeamPointingControl(object):
                 self.pipelines.append(p)
                 
         # Query the pipelines to figure out the frequency ranges they are sending
+        # and what their beam calibration state is (>=90% of inputs = good)
         self.freqs = []
+        self._cal_set = []
         for p in self.pipelines:
             metadata = p.beamform.get_bifrost_status()
             freq = chan_to_freq(metadata['chan0'] + numpy.arange(metadata['nchan']))
             self.freqs.append(freq)
             
-        # Make a variable to track the per-pipeline calibration state
-        self._cal_set = [False for p in self.pipelines]
-        
+            cal_state = metadata['stats'][f"cal_gains{self.beam-1}"]
+            if isinstance(cal_state, str):
+                cal_state = [1 if f.find('True') != -1 else 0 for f in cal_state.split(',')]
+            if sum(cal_state) >= NINPUT_CAL_FOR_GOOD:
+                self._cal_set.append(True)
+            else:
+                self._cal_set.append(False)
+                
         # Make a variable to keep track of a "gain"
         self._gain = 1.0
         
