@@ -1,21 +1,20 @@
 
 <!DOCTYPE html>
 
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
     <title>OVRO-LWA mnc_python documentation &#8212; mnc_python  documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-    <script src="_static/jquery.js"></script>
-    <script src="_static/underscore.js"></script>
     <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx_highlight.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Example Observations with OVRO-LWA" href="ExampleObs.html" />
+    <link rel="next" title="Example Observing session with OVRO-LWA" href="ExampleObs.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -33,16 +32,19 @@
           <div class="body" role="main">
             
   <section id="ovro-lwa-mnc-python-documentation">
-<h1>OVRO-LWA mnc_python documentation<a class="headerlink" href="#ovro-lwa-mnc-python-documentation" title="Permalink to this headline">¶</a></h1>
+<h1>OVRO-LWA mnc_python documentation<a class="headerlink" href="#ovro-lwa-mnc-python-documentation" title="Permalink to this heading">¶</a></h1>
 <p>The OVRO-LWA Monitor and Control system provides access to analog, digital, and computing systems. This is used to support a range of users, such as Observer on Duty (OoD), engineers, and science users.</p>
 <p>Major subsystems include: ARX, F-engines, X-engines, and Cal-Im cluster. Many subsystems have additional monitor and control software written by subsystem designers. mnc_python provides a simple, high-level access to those subsystems via python.</p>
 </section>
 <section id="contents">
-<h1>Contents:<a class="headerlink" href="#contents" title="Permalink to this headline">¶</a></h1>
+<h1>Contents:<a class="headerlink" href="#contents" title="Permalink to this heading">¶</a></h1>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="ExampleObs.html">Example Observations with OVRO-LWA</a></li>
-<li class="toctree-l1"><a class="reference internal" href="api.html">mnc_python class API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ExampleObs.html">Example Observing session with OVRO-LWA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">mnc_python class API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api.html#mnc.mcs.Client"><code class="docutils literal notranslate"><span class="pre">Client</span></code></a></li>
+</ul>
+</li>
 </ul>
 </div>
 <ul class="simple">
@@ -69,7 +71,7 @@
 
 <h3>Navigation</h3>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="ExampleObs.html">Example Observations with OVRO-LWA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ExampleObs.html">Example Observing session with OVRO-LWA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">mnc_python class API</a></li>
 </ul>
 
@@ -77,7 +79,7 @@
 <h3>Related Topics</h3>
 <ul>
   <li><a href="#">Documentation overview</a><ul>
-      <li>Next: <a href="ExampleObs.html" title="next chapter">Example Observations with OVRO-LWA</a></li>
+      <li>Next: <a href="ExampleObs.html" title="next chapter">Example Observing session with OVRO-LWA</a></li>
   </ul></li>
 </ul>
 </div>
@@ -90,7 +92,7 @@
     </form>
     </div>
 </div>
-<script>$('#searchbox').show(0);</script>
+<script>document.getElementById('searchbox').style.display = "block"</script>
 
 
 
@@ -107,8 +109,8 @@
       &copy;2022, Casey Law.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.5.0</a>
-      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 6.1.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
       
       |
       <a href="_sources/index.rst.txt"

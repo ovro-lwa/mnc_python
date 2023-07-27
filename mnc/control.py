@@ -1,6 +1,7 @@
 import os.path
 import yaml
 import logging
+from typing import Union, Callable, List
 import glob
 import numpy as np
 import glob
@@ -26,15 +27,18 @@ from mnc import mcs, xengine_beamformer_control
 
 
 CONFIG_FILE = '/home/pipeline/proj/lwa-shell/mnc_python/config/lwa_config_calim.yaml'
+FPG_FILE = '/home/ubuntu/proj/lwa-shell/caltech-lwa/snap2_f_200msps_64i_4096c/outputs/snap2_f_200msps_64i_4096c.fpg'
 
+CORE_RADIUS_M = 200.0
 
 class Controller():
     """ Parse configuration and control all subsystems in uniform manner.
     Ideally, will also make it easy to monitor basic system status.
     etcdhost is used by x-engine. data recorders use value set in mnc/common.py code.
+    Can overload default recorders by providing a list or single string name at instantiation.
     """
 
-    def __init__(self, config_file=CONFIG_FILE, etcdhost=None, xhosts=None, npipeline=None):
+    def __init__(self, config_file=CONFIG_FILE, etcdhost=None, xhosts=None, npipeline=None, recorders=None):
         self.config_file = os.path.abspath(config_file)
         conf = self.parse_config(config_file)
 
@@ -43,6 +47,13 @@ class Controller():
         self.xhosts = xhosts
         self.npipeline = npipeline
         self.set_properties()
+
+        allowed = ['drvs', 'drvf'] + [f'dr{n}' for n in range(1,11)]  # correct input recorder names
+        if recorders is not None:
+            if isinstance(recorders, str):
+                recorders = [recorders]
+            recorders = [recorder for recorder in recorders if recorder in allowed]   # clean input
+            self.conf['dr']['recorders'] = recorders
 
         # report
         modes = []
@@ -55,6 +66,8 @@ class Controller():
                 modes.append(f"beam{b}")
         logger.info(f"Loaded configuration for {self.nhosts} x-engine host(s) running {self.npipeline} pipeline(s) each")
         logger.info(f"Supported recorder modes are: {','.join(modes)}")
+        if 'beam2' in modes or 'beam3' in modes or 'beam4' in modes:
+            logger.info("\t Note: beams 2 (Solar), 3 (FRB), and 4 (Jovian) are reserved for specific science applications. Check with those teams before using them.")
         logger.info(f"etcd server being used is: {self.etcdhost}")
 
     @staticmethod
@@ -106,6 +119,7 @@ class Controller():
         p = Lwa352CorrelatorControl(self.xhosts, npipeline_per_host=self.npipeline, etcdhost=self.etcdhost, log=logger.getChild('Lwa352CorrelatorControl'))
         self.pcontroller = p
         self.pipelines = p.pipelines
+        self.xhosts_up = sorted(set([p.host for p in self.pipelines]))
 
         # data recorder control client
         self.drvnums = [ip[-2:]+str(port)[-2:] for (ip, port) in zip(self.x_dest_corr_ip,
@@ -145,7 +159,7 @@ class Controller():
         if initialize or program:
             if snap2names == fconf['snap2s_inuse']:
                 if (not all(is_programmed.values()) or force) and program:
-                    ec.send_command(0, 'feng', 'program', timeout=60*7, n_response_expected=11)
+                    ec.send_command(0, 'feng', 'program', timeout=60*7, n_response_expected=11, kwargs={'fpgfile': FPG_FILE})
                     ec.send_command(0, 'feng', 'initialize', kwargs={'read_only':False}, timeout=60*5, n_response_expected=11)
                 else:
                     logger.info('All snaps already programmed.')
@@ -196,11 +210,12 @@ class Controller():
 
         return timestamp, stats
 
-    def configure_xengine(self, recorders=None, calibratebeams=False, full=True):
+    def configure_xengine(self, recorders=None, calibratebeams=False, full=False, timeout=300):
         """ Restart xengine. Configure pipelines to send data to recorders.
         Recorders is list of recorders to configure output to. Defaults to those in config file.
         Supported recorders are "drvs" (slow vis), "drvf" (fast vis), "dr[n]" (power beams)
         Option "full" will stop/start/clear pipelines/beamformer controllers.
+        timeout is for x-engine start_pipelines method.
         """
 
         dconf = self.conf['dr']
@@ -209,64 +224,18 @@ class Controller():
         elif not isinstance(recorders, (list, tuple)):
             recorders = [recorders,]
 
-        
-        xconf = self.conf['xengines']
-
         if full:
-            logger.info("Stopping/starting pipelines")
+            logger.info("Stopping/starting pipelines with 20s sleep")
             # stop before starting
-            self.pcontroller.stop_pipelines()   
-            self.pcontroller.start_pipelines() 
-
+            self.pcontroller.stop_pipelines()
+            self.stop_xengine()
+            self.start_xengine(timeout=timeout)
             # Clear the beamformer state
             self.bfc.clear()
 
         logger.info(f'pipelines up? {self.pcontroller.pipelines_are_up()}')
-
-        # slow
-        if 'drvs' in recorders or 'drvf' in recorders:
-            logger.info("Configuring x-engine for visibilities")
-            try:
-                self.pcontroller.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_slow_port)  # iterates over all slow corr outputs
-            except KeyError:
-                logger.error("KeyError when configuring correlator. Are data being sent from f to x-engines?")
-
-        else:
-            logger.info("Not configuring x-engine for visibilities")            
-
-        if 'drvf' in recorders:
-            fast_antnames = xconf.get('fast_vis_ants', [])
-
-            if len(fast_antnames):
-                logger.info("Selecting antennas for fast visibilities.")
-            elif len(fast_antnames) == 0:
-                logger.warning("No antennas selected for fast visibilities")
-
-            # Empty array for visibility selection indices
-            fast_vis_out = np.zeros([self.pcontroller.pipelines[0].corr_subsel.nvis_out, 2, 2], dtype=int)
-            # "LWA-007"-style antenna names for fast visibilities
-            fast_corrids = []
-            for antname in fast_antnames:
-                try:
-                    fast_corrids += [mapping.antname_to_correlator(antname)]
-                except KeyError:
-                    logger.error(f'Couldn\'t convert antenna {antname} to a correlator index')
-                    logger.info('Continuing without this antenna')
-            # Construct list of all baselines (including autos) for antennas in the list
-            fast_vis_n = 0
-            for corridn_a, corrid_a in enumerate(fast_corrids):
-                for corridn_b, corrid_b in enumerate(fast_corrids[corridn_a:]):
-                    # Add all 4 polarization products
-                    fast_vis_out[fast_vis_n+0] = [[corrid_a, 0], [corrid_b, 0]]
-                    fast_vis_out[fast_vis_n+1] = [[corrid_a, 0], [corrid_b, 1]]
-                    fast_vis_out[fast_vis_n+2] = [[corrid_a, 1], [corrid_b, 1]]
-                    fast_vis_out[fast_vis_n+3] = [[corrid_a, 1], [corrid_b, 0]]
-                    fast_vis_n += 4
-            for i in range(self.npipeline*self.nhosts):
-                self.pcontroller.pipelines[i].corr_subsel.set_baseline_select(fast_vis_out)
-                self.pcontroller.pipelines[i].corr_output_part.set_destination(self.x_dest_corr_ip[i], self.x_dest_corr_fast_port[i%4])
-        else:
-            logger.info("Not configuring x-engine for fast visibilities")            
+        if not self.pcontroller.pipelines_are_up():
+            raise RuntimeError("X engine is not up. Consider restarting xengine with full=True.")
 
         if calibratebeams:
             cal_directory = self.conf['xengines']['cal_directory']
@@ -279,10 +248,10 @@ class Controller():
                 continue
 
             num = int(recorder[2:])
-            logger.info(f"Configuring x-engine for beam {num}")
+            logger.info(f"Configuring x-engine for beam {num} on xhosts {self.xhosts_up}")
             try:
-                self.bfc[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts,
-                                                                                nserver=len(self.xhosts),
+                self.bfc[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts_up,
+                                                                                nserver=len(self.xhosts_up),
                                                                                 npipeline_per_server=self.npipeline,
                                                                                 cal_directory=cal_directory,
                                                                                 etcdhost=self.etcdhost)
@@ -296,13 +265,22 @@ class Controller():
                 port = self.conf['xengines']['x_dest_beam_port']
                 self.bfc[num].set_beam_dest(addr=addr[num-1], port=port[num-1])
 
+        # slow
+        if 'drvs' in recorders or 'drvf' in recorders:
+            logger.warn('fast and slow vis are already configured by default. '
+                        'If you changed data destination or antenna selection,'
+                        'you need to restart the X engine with full=True.')
 
     def control_bf(self, num=1, coord=None, coordtype='celestial', targetname=None,
-                   track=True):
+                   track=True, weight: Union[str, Callable[[float], float]]='core',
+                   beam_gain=None, duration=0):
         """ Point and track beamformers.
         num refers to the beamformer number (1 through 8).
         If track=True, target is treated as celestial coords or by target name
         If track=False, target is treated as (az, el)
+        weight can be: 'core', 'natural', a single antenna name, or a function (see xengine_beamformer_control.set_beam_weights)
+        beam_gain optionally specifies the amplitude scaling for the beam.
+        duration is time to track in seconds (0 means 12 hrs).
         target can be:
          - source name ('zenith', 'sun') or
          - tuple of (ra, dec) in (hourangle, degrees).
@@ -326,6 +304,20 @@ class Controller():
             logger.error(msg)
             raise KeyError(msg)
 
+        if (callable(weight)):
+            assert weight.__code__.co_argcount == 1, "weight function must only take one argument"
+            self.bfc[num].set_beam_weighting(weight)
+        elif (weight == 'core'):
+            self.bfc[num].set_beam_weighting(_core_weight_func)
+        elif (weight == 'natural'):
+            pass
+        elif weight.startswith('LWA-'):
+            self.bfc[num].set_beam_weighting(flag_ants=_single_ant_flags_list(weight))
+        else:
+            raise ValueError(f'Invalid value for weight {weight}')
+
+        if beam_gain:
+            self.bfc[num].set_beam_gain(beam_gain)
         if targetname is not None:
             self.bfc[num].set_beam_target(targetname)
         elif ra is not None:
@@ -340,9 +332,9 @@ class Controller():
         if track:
             t = xengine_beamformer_control.BeamTracker(self.bfc[num], update_interval=self.conf['xengines']['update_interval'])
             if targetname is not None:
-                t.track(targetname)
+                t.track(targetname, duration=duration)
             elif ra is not None:
-                t.track(ra, dec=dec)
+                t.track(ra, dec=dec, duration=duration)
             else:
                 logging.info(f'Beam {num}: Not tracking for azel input')
         else:
@@ -365,18 +357,67 @@ class Controller():
                              f"{capture_status['gbps']:.1f}",
                              f"{corr_status['gbps']:.1f}"))
 
+    def start_xengine(self, timeout=300):
+        if self.pcontroller.pipelines_are_up():
+            msg = 'Pipelines are running. Please stop the xengine first.'
+            logger.error(msg)
+            raise RuntimeError(msg)
+
+        logger.info('Starting Xengine and configuring for visibilities.')
+        self.pcontroller.start_pipelines(timeout=timeout)
+        try:
+            self.pcontroller.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_slow_port)  # iterates over all slow corr outputs
+        except KeyError:
+            msg = "KeyError when configuring correlator. Are data being sent from f to x-engines?"
+            logger.error(msg)
+            raise RuntimeError(msg)
+
+        xconf = self.conf['xengines']
+        fast_antnames = xconf.get('fast_vis_ants', [])
+
+        if len(fast_antnames):
+            logger.info("Selecting antennas for fast visibilities.")
+        elif len(fast_antnames) == 0:
+            logger.warning("No antennas selected for fast visibilities")
+            return
+
+        # Empty array for visibility selection indices
+        fast_vis_out = np.zeros([self.pcontroller.pipelines[0].corr_subsel.nvis_out, 2, 2], dtype=int)
+        # "LWA-007"-style antenna names for fast visibilities
+        fast_corrids = []
+        for antname in fast_antnames:
+            try:
+                fast_corrids += [mapping.antname_to_correlator(antname)]
+            except KeyError:
+                logger.error(f'Couldn\'t convert antenna {antname} to a correlator index')
+                logger.info('Continuing without this antenna')
+        # Construct list of all baselines (including autos) for antennas in the list
+        fast_vis_n = 0
+        for corridn_a, corrid_a in enumerate(fast_corrids):
+            for corridn_b, corrid_b in enumerate(fast_corrids[corridn_a:]):
+                # Add all 4 polarization products
+                fast_vis_out[fast_vis_n+0] = [[corrid_a, 0], [corrid_b, 0]]
+                fast_vis_out[fast_vis_n+1] = [[corrid_a, 0], [corrid_b, 1]]
+                fast_vis_out[fast_vis_n+2] = [[corrid_a, 1], [corrid_b, 1]]
+                fast_vis_out[fast_vis_n+3] = [[corrid_a, 1], [corrid_b, 0]]
+                fast_vis_n += 4
+        for i in range(self.npipeline*self.nhosts):
+            self.pcontroller.pipelines[i].corr_subsel.set_baseline_select(fast_vis_out)
+            self.pcontroller.pipelines[i].corr_output_part.set_destination(self.x_dest_corr_ip[i], self.x_dest_corr_fast_port[i%4])
+
     def stop_xengine(self):
         """ Stop xengines listed in configuration file.
         """
 
         self.pcontroller.stop_pipelines()
+        time.sleep(20)
 
-    def start_dr(self, recorders=None, start='now', duration=None, time_avg=1):
+    def start_dr(self, recorders=None, t0='now', duration=None, time_avg=1):
         """ Start data recorders listed recorders.
         Defaults to starting those listed in configuration file.
         Recorder list can be overloaded with 'drvs' (etc) or individual recorders (e.g., 'drvs7601').
-        start is either 'now' or a start time (astropy Time, mjd float, and isot strings supported).
-        duration is power beam recording in milliseconds.
+        t0 is either 'now' or a start time (astropy Time, mjd float, and isot strings supported).
+        duration is length of data recording in milliseconds (required for power beam recording; optional for visibilities).
         time_avg is power beam averaging time in milliseconds (integer converted to next lower power of 2).
         """
 
@@ -387,22 +428,24 @@ class Controller():
             recorders = [recorders,]
 
         # set start time arguments
-        if isinstance(start, str):
-            assert start == 'now'
-            mjd = mpm = start
+        if isinstance(t0, str) and t0 == 'now':
+            mjd = mpm = t0
+            start = Time.now()
         else:
-            if not isinstance(start, Time):
+            if not isinstance(t0, Time):
                 try:
-                    start = Time(start, format='isot')
+                    start = Time(t0, format='isot')
                 except ValueError:
-                    start = Time(start, format='mjd')
+                    start = Time(t0, format='mjd')
+            else:
+                start = t0
 
             mjd_dt = start.mjd % 1
             mjd = int((start - TimeDelta(mjd_dt, format='jd')).mjd)
             mpm = int(mjd_dt * 24 * 3600 * 1e3)
                 
         # start ms writing
-        logger.info(f"Starting recorders: {recorders}")
+        logger.info(f"Starting recorders {recorders} at {start.mjd} (currently {Time.now().mjd})")
         for recorder in recorders:
             accepted = False
 
@@ -424,6 +467,11 @@ class Controller():
             # visibilities
             if recorder in ['drvs', 'drvf'] + ['drvs' + num for num in self.drvnums]:
                 accepted, response = self.drc.send_command(recorder, 'start', mjd=mjd, mpm=mpm)
+                if duration is not None:
+                    if response['status'] != 'success':
+                        logger.warn("Data recorder not started successfully. Trying to schedule stop...")
+                    stop = start + TimeDelta(duration/1e3/24/3600, format='jd')
+                    self.stop_dr(recorders=recorder, t0=stop)
 
             if not accepted:
                 logger.warn(f"no response from {recorder}")
@@ -459,9 +507,11 @@ class Controller():
 
         return statuses
 
-    def stop_dr(self, recorders=None):
+    def stop_dr(self, recorders=None, t0='now', queue_number=0):
         """ Stop data recorders in list recorders.
         Defaults to stopping those listed in configuration file.
+        t0 is stop time (astropy Time object, mjd, or isot format supported).
+        queue_number is index of queued beamformer observations (default stops most recent == 0).
         """
 
         dconf = self.conf['dr']
@@ -470,12 +520,29 @@ class Controller():
         elif not isinstance(recorders, (list, tuple)):
             recorders = [recorders,]
 
+        # set start time arguments
+        if isinstance(t0, str):
+            assert t0 == 'now'
+            mjd = mpm = t0
+            start = Time.now()
+        else:
+            if not isinstance(t0, Time):
+                try:
+                    start = Time(t0, format='isot')
+                except ValueError:
+                    start = Time(t0, format='mjd')
+            else:
+                start = t0
+
+            mjd_dt = start.mjd % 1
+            mjd = int((start - TimeDelta(mjd_dt, format='jd')).mjd)
+            mpm = int(mjd_dt * 24 * 3600 * 1e3)
+                
         for recorder in recorders:
             if recorder in ['drvs', 'drvf']:
-                accepted, response = self.drc.send_command(recorder, 'stop', mjd='now', mpm='now')
+                accepted, response = self.drc.send_command(recorder, 'stop', mjd=mjd, mpm=mpm)
             elif recorder[:2] == 'dr':
-                queue = 0  # current observation
-                accepted, response = self.drc.send_command(recorder, 'cancel', queue_number=queue)
+                accepted, response = self.drc.send_command(recorder, 'cancel', queue_number=queue_number)
 
             if not accepted:
                 logger.warn(f"no response from {recorder}")
@@ -483,3 +550,11 @@ class Controller():
                 logger.info(f"recording on {recorder} stopped")
             else:
                 logger.warn(f"stopping recording on {recorder} failed: {response['response']}")
+
+def _core_weight_func(r: float) -> float:
+    return 1.0 if r < CORE_RADIUS_M else 0.0
+
+def _single_ant_flags_list(antname: str) -> List[int]:
+    flag_list = list(range(352))
+    flag_list.remove(mapping.antname_to_correlator(antname))
+    return flag_list

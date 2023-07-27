@@ -12,6 +12,8 @@
 # 20230218 Set ~unused feng inputs to use_adc().
 # 20230304 Revised to include a list of which SNAP2 boards to load.
 # 20230304 Define 'dsig2feng()' here to avoid dependence on 'fengFunctions' package.
+# 20230310 Reviuse unused inputs handling to set inputs to adc if none are unused.
+# 20230614 Add writing to log file.
 
 import sys
 import scipy.io as mat
@@ -189,29 +191,28 @@ if 'delay_dsig' in config.keys():
 # SET UNUSED F INPUTS TO ZERO
 #----------------------------
 
+print('SETTING UNUSED F ENG INPUTS TO ZERO.')
 if 'unused' in cfgkeys:
-    print('SETTING UNUSED F ENG INPUTS TO ZERO.')
     unused = config['unused']
-    for i in range(704):
-        sig = dsig2feng(i)
-        if not sig[0] in snaps: continue        
-        snap_id = sig[0]
-        input_id = sig[1]
-        if unused[i]==True:
-            ec.send_command(snap_id, 'input', 'use_zero', kwargs={'stream':input_id})
-        else:
-            ec.send_command(snap_id, 'input', 'use_adc', kwargs={'stream':input_id})
-    print('Set',sum(unused),'inputs to use_zero and',sum(1-unused),'inputs to use_adc.')
 else:
-    ec.send_command(0, 'input', 'use_adc')
-
+    unused = np.array([0]*704)
+for i in range(704):
+    sig = dsig2feng(i)
+    if not sig[0] in snaps: continue       
+    snap_id = sig[0]
+    input_id = sig[1]
+    if unused[i]==True:
+        ec.send_command(snap_id, 'input', 'use_zero', kwargs={'stream':input_id})
+    else:
+        ec.send_command(snap_id, 'input', 'use_adc', kwargs={'stream':input_id})
+print('Set',sum(unused),'inputs to use_zero and',sum(1-unused),'inputs to use_adc.')
             
 
 #======================
 # NOW LOAD ARX SETTINGS
 #----------------------
 
-import mnc.myarx as a
+from mnc import myarx as a
 
 adrs = config['adrs']
 settings = config['settings']
@@ -227,6 +228,15 @@ for i in range(len(adrs)):
         a.raw(adrs[i],'SETA'+codes)
         print('Loaded: ',adrs[i],codes)
         #print(settings[i])
-    except Exception as e:
-        print(e)
+    except:
         continue
+
+#========================
+# MAKE LOG ENTRY
+#------------------------
+import getpass
+path = '/home/pipeline/proj/lwa-shell/mnc_python/data/'
+with open(path+'arxAndF-settings.log','a') as f:
+    t = time.time()
+    print(time.asctime(time.gmtime(t)), t, getpass.getuser(), sys.argv[1], config['time'], sep='\t',file=f)
+
