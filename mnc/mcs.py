@@ -1,9 +1,4 @@
-from __future__ import division, print_function
-try:
-    range = xrange
-except NameError:
-    pass
-    
+
 import os
 import sys
 import json
@@ -13,10 +8,7 @@ import etcd3
 import base64
 import signal
 import warnings
-try:
-    from io import BytesIO
-except ImportError:
-    from StringIO import StringIO as BytesIO
+from io import BytesIO
 from datetime import datetime, timedelta
 from textwrap import fill as tw_fill
 
@@ -29,11 +21,6 @@ from mnc.common import ETCD_HOST, ETCD_PORT
 
 __all__ = ['MonitorPoint', 'MultiMonitorPoint', 'ImageMonitorPoint',
            'MonitorPointCallbackBase', 'CommandCallbackBase', 'Client']
-
-
-temp = etcd3.client()
-ETCD_TYPE = type(temp)
-del temp
 
 
 class MonitorPoint(object):
@@ -339,7 +326,7 @@ class CommandCallbackBase(object):
     def __init__(self, client):
         if isinstance(client, Client):
             client = client.client
-        elif isinstance(client, ETCD_TYPE):
+        elif isinstance(client, etcd3.Etcd3Client):
             pass
         else:
             raise TypeError("Expected a mcs.Client or etcd3.client.Ectd3Client")
@@ -410,7 +397,9 @@ class Client(object):
         
         self.client = etcd3.client(host=ETCD_HOST, port=ETCD_PORT)
         self._mon_manifest = ['manifest/monitoring', 'manifest/commands']
+        self._mon_manifest_lock = self.client.lock('mon_manifest_lock', ttl=5)
         self._cmd_manifest = []
+        self._cmd_manifest_lock = self.client.lock('cmd_manifest_lock', ttl=5)
         self._watchers = {}
         
     def __del__(self):
@@ -430,7 +419,7 @@ class Client(object):
         whether or not an update was made.
         """
        
-        with self.client.lock(self.id, ttl=5) as lock:
+        with self._mon_manifest_lock:
             # Is it alread in the local manifest?
             updated = False
             value = None
@@ -478,7 +467,7 @@ class Client(object):
         not an update was made.
         """
        
-        with self.client.lock(self.id, ttl=5) as lock:
+        with self._cmd_manifest_lock:
             # Is it alread in the local manifest?
             updated = False
             value = None
