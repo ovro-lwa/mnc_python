@@ -53,8 +53,10 @@ class Controller():
             if isinstance(recorders, str):
                 recorders = [recorders]
             # clean input
-            print('Removing unexpected recorder names:', [recorder for recorder in recorders if recorder not in allowed])
-            recorders = [recorder for recorder in recorders if recorder in allowed]
+            disallowed = [recorder for recorder in recorders if recorder not in allowed]
+            if len(disallowed):
+                print(f'Removing unexpected recorder names: {disallowed}')
+                recorders = [recorder for recorder in recorders if recorder in allowed]
             self.conf['dr']['recorders'] = recorders
 
         # report
@@ -247,8 +249,8 @@ class Controller():
             cal_directory = '/pathshouldnotexist'
 
         for recorder in recorders:
-            # skip vis recorders
-            if recorder in ['drvs', 'drvf']:
+            # skip vis recorders and assume dr1 sets appropriately for drt1
+            if recorder in ['drvs', 'drvf', 'drt1']:
                 continue
 
             num = int(recorder[2:])
