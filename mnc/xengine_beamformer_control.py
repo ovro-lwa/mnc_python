@@ -140,9 +140,13 @@ class BeamPointingControl(object):
             freq = chan_to_freq(metadata['chan0'] + numpy.arange(metadata['nchan']))
             self.freqs.append(freq)
             
-            cal_state = metadata['stats'][f"cal_gains{self.beam-1}"]
-            if isinstance(cal_state, str):
-                cal_state = [1 if f.find('True') != -1 else 0 for f in cal_state.split(',')]
+            cal_state0 = metadata['stats'][f"cal_gains{2*(self.beam-1)+0}"]
+            cal_state1 = metadata['stats'][f"cal_gains{2*(self.beam-1)+1}"]
+            if isinstance(cal_state0, str):
+                cal_state0 = [1 if f.find('True') != -1 else 0 for f in cal_state0.split(',')]
+            if isinstance(cal_state1, str):
+                cal_state1 = [1 if f.find('True') != -1 else 0 for f in cal_state1.split(',')]
+            cal_state = [s0 or s1 for s0,s1 in zip(cal_state0, cal_state1)]
             if sum(cal_state) >= NINPUT_CAL_FOR_GOOD:
                 self._cal_set.append(True)
             else:
