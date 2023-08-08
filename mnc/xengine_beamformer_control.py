@@ -351,11 +351,13 @@ class BeamPointingControl(object):
         ptp = PipelineTaskPool(self.pipelines)
         ptp.beamform.update_delays(2*(self.beam-1)+pol, delays, amps, load_time=load_time, time_unit='time')
         
-    def set_beam_pointing(self, az, alt, degrees=True, load_time=None):
+    def set_beam_pointing(self, az, alt, degrees=True, distance=numpy.inf, load_time=None):
         """
         Given a topocentric pointing in azimuth and altitude (elevation), point
         the beam in that direction.  The `degrees` keyword determines if the
-        coordinates are interpreted in degrees (True) or radians (False).
+        coordinates are interpreted in degrees (True) or radians (False).  If
+        an optional distance (in m) is given and that distance is less than 1 Mm
+        then the beamforming coefficients include a near field term.
         """
         
         # Issue a warning if it doesn't look like we've been calibrated
@@ -369,6 +371,12 @@ class BeamPointingControl(object):
         assert(az >= 0 and az < 2*numpy.pi)
         assert(alt >= 0 and alt <= numpy.pi/2)
         
+        # Conversion of the distance to m
+        try:
+            distance = distance.to('m').value
+        except AttributeError:
+            pass
+            
         # Figure out what the delays to zenith are
         # TODO: Is this needed?
         zen = numpy.array([0, 0, 1])
@@ -378,8 +386,12 @@ class BeamPointingControl(object):
         dir = numpy.array([numpy.cos(alt)*numpy.sin(az), 
                            numpy.cos(alt)*numpy.cos(az), 
                            numpy.sin(alt)])
-        dir_delay = [numpy.dot(dir, ant.enz)/speedOfLight for ant in self.station.antennas]
-        
+        if distance >= 1e6:
+            dir_delay = [numpy.dot(dir, ant.enz)/speedOfLight for ant in self.station.antennas]
+        else:
+            dir *= distance
+            dir_delay = [numpy.sqrt(((dir-ant.enz)**2).sum())/speedOfLight for ant in self.station.antennas]
+            
         # Subtract what we need from what we have from the calibration
         # TODO: Is this correct?
         delays = numpy.array(dir_delay) - numpy.array(zen_delay)
