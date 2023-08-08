@@ -390,6 +390,59 @@ class BeamPointingControl(object):
         for pol in range(NPOL):
             self.set_beam_delays(delays, pol, load_time=load_time)
             
+    def set_beam_wgs84_pointing(self, lat, lng, elevation, degrees=True, load_time=None, verbose=True):
+        """
+        Given a pointing position characterized by a WGS84 latitude (+N),
+        longitude (+E), and elevation (m), point the beam in that direction.
+        The `degrees` keyword determines if the latitude/longitude coordinates
+        are interpreted in degrees (True) or radians (False).
+        """
+        
+        # Convertion from radians -> degrees, plus a validation
+        if not degrees:
+            lat *= 180/numpy.pi
+            lng *= 180/numpy.pi
+        assert(lat >= -90 and lat <= 90)
+        assert(lng >= -180 and lng <= 180)
+        
+        # Set our pointing location
+        dir = EarthLocation.from_geodetic(lng, lat, elevation, ellipsoid='WGS84')
+        dir = numpy.array([dir.x.to('m').value,
+                           dir.y.to('m').value,
+                           dir.z.to('m').value])
+                           
+        # Basic info. for the observer
+        if verbose:
+            ## Look direction and distance
+            rho = dir - self.station.ecef
+            rot = numpy.array([[ numpy.sin(self.station.lat)*numpy.cos(self.station.long), numpy.sin(self.station.lat)*numpy.sin(self.station.long), -numpy.cos(self.station.lat)], 
+                               [-numpy.sin(self.station.long),                             numpy.cos(self.station.long),                              0                  ],
+                               [ numpy.cos(self.station.lat)*numpy.cos(self.station.long), numpy.cos(self.station.lat)*numpy.sin(self.station.long),  numpy.sin(self.station.lat)]])
+            sez = numpy.dot(rot, rho)
+            
+            d = numpy.sqrt( (rho**2).sum() )
+            el = numpy.arcsin(sez[2] / d)
+            az = numpy.arctan2(sez[1], -sez[0])
+            print(f"Pointing target appears at azimuth {az*180/numpy.pi:.1f} deg, elevation {el*180/numpy.pi:.1f} deg and is {d/1e3} km away")
+            
+        # Figure out what the delays to zenith are
+        # TODO: Is this needed?
+        zen = numpy.array([0, 0, 1])
+        zen_delay = [numpy.dot(zen, ant.enz)/speedOfLight for ant in self.station.antennas]
+        
+        # Figure out what the delays to the pointing direction are
+        dir_delay = [numpy.sqrt(((dir - ant.ecef)**2).sum())/speedOfLight for ant in self.station.antennas]
+        
+        # Subtract what we need from what we have from the calibration
+        # TODO: Is this correct?
+        delays = numpy.array(dir_delay) - numpy.array(zen_delay)
+        delays = numpy.repeat(delays, NPOL)
+        delays = delays.max() - delays
+        
+        # Apply
+        for pol in range(NPOL):
+            self.set_beam_delays(delays, pol, load_time=load_time)
+            
     def set_beam_target(self, target_or_ra, dec=None, load_time=None, verbose=True):
         """
         Given the name of an astronomical target, 'sun', or 'zenith', compute the
