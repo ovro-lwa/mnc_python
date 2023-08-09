@@ -48,11 +48,15 @@ class Controller():
         self.npipeline = npipeline
         self.set_properties()
 
-        allowed = ['drvs', 'drvf'] + [f'dr{n}' for n in range(1,11)]  # correct input recorder names
+        allowed = ['drvs', 'drvf'] + [f'dr{n}' for n in range(1,11)] + ['drt1'] # correct input recorder names
         if recorders is not None:
             if isinstance(recorders, str):
                 recorders = [recorders]
-            recorders = [recorder for recorder in recorders if recorder in allowed]   # clean input
+            # clean input
+            disallowed = [recorder for recorder in recorders if recorder not in allowed]
+            if len(disallowed):
+                print(f'Removing unexpected recorder names: {disallowed}')
+                recorders = [recorder for recorder in recorders if recorder in allowed]
             self.conf['dr']['recorders'] = recorders
 
         # report
@@ -61,13 +65,15 @@ class Controller():
             modes.append('slow')
         if 'drvf' in self.conf['dr']['recorders']:
             modes.append('fast')
+        if 'drt1' in self.conf['dr']['recorders']:
+            modes.append('teng')
         for b in range(1, 11):
             if f"dr{b}" in self.conf['dr']['recorders']:
                 modes.append(f"beam{b}")
         logger.info(f"Loaded configuration for {self.nhosts} x-engine host(s) running {self.npipeline} pipeline(s) each")
         logger.info(f"Supported recorder modes are: {','.join(modes)}")
-        if 'beam2' in modes or 'beam3' in modes or 'beam4' in modes:
-            logger.info("\t Note: beams 2 (Solar), 3 (FRB), and 4 (Jovian) are reserved for specific science applications. Check with those teams before using them.")
+        if 'beam1' in modes or 'teng' in modes or 'beam2' in modes or 'beam3' in modes or 'beam4' in modes:
+            logger.info("\t Note: beams 1 and t-engine (VLBI/FRB), beam 2 (Solar), 3 (FRB), and 4 (Jovian) are reserved for specific science applications. Check with those teams before using them.")
         logger.info(f"etcd server being used is: {self.etcdhost}")
 
     @staticmethod
@@ -213,7 +219,7 @@ class Controller():
     def configure_xengine(self, recorders=None, calibratebeams=False, full=False, timeout=300):
         """ Restart xengine. Configure pipelines to send data to recorders.
         Recorders is list of recorders to configure output to. Defaults to those in config file.
-        Supported recorders are "drvs" (slow vis), "drvf" (fast vis), "dr[n]" (power beams)
+        Supported recorders are "drvs" (slow vis), "drvf" (fast vis), "dr[n]" (power beams), "drt1" (teng)
         Option "full" will stop/start/clear pipelines/beamformer controllers.
         timeout is for x-engine start_pipelines method.
         """
@@ -243,8 +249,8 @@ class Controller():
             cal_directory = '/pathshouldnotexist'
 
         for recorder in recorders:
-            # try to skip recorders not named "dr<n>"
-            if (len(recorder) != 3) and (recorder[:2] == 'dr'):
+            # skip vis recorders and assume dr1 sets appropriately for drt1
+            if recorder in ['drvs', 'drvf', 'drt1']:
                 continue
 
             num = int(recorder[2:])
@@ -547,7 +553,7 @@ class Controller():
         for recorder in recorders:
             if recorder in ['drvs', 'drvf']:
                 accepted, response = self.drc.send_command(recorder, 'stop', mjd=mjd, mpm=mpm)
-            elif recorder[:2] == 'dr':
+            else:
                 accepted, response = self.drc.send_command(recorder, 'cancel', queue_number=queue_number)
 
             if not accepted:
