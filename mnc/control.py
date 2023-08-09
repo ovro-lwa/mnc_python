@@ -450,28 +450,34 @@ class Controller():
             accepted = False
 
             # power beams
-            try:
-                num = int(recorder[2:], 10)
-                if recorder in [f'dr{n}' for n in range(1,11)]:
-                    if duration is not None:
-                        assert isinstance(time_avg, int)
-                        time_avg = 2 ** int(np.log2(time_avg))  # set to next lower power of 2
-                        accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd,
-                                                                   start_mpm=mpm, duration_ms=duration,
-                                                                   time_avg=time_avg)
-                    else:
-                        logger.warn("Power beam recordings require a duration")
-            except ValueError:
-                pass
+            if recorder in [f'dr{n}' for n in range(1,11)]:
+                if duration is not None:
+                    assert isinstance(time_avg, int)
+                    time_avg = 2 ** int(np.log2(time_avg))  # set to next lower power of 2
+                    accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd,
+                                                               start_mpm=mpm, duration_ms=duration,
+                                                               time_avg=time_avg)
+                else:
+                    logger.warn("Power beam recordings require a duration")
 
-            # visibilities
-            if recorder in ['drvs', 'drvf'] + ['drvs' + num for num in self.drvnums]:
+            elif recorder in [f'drt{n}' for n in range(1,3)]:
+                if duration is not None:
+                    assert isinstance(time_avg, int)
+                    time_avg = 2 ** int(np.log2(time_avg))  # set to next lower power of 2
+                accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd,
+                                                           start_mpm=mpm, duration_ms=duration,
+                                                           time_avg=time_avg)
+
+            elif recorder in ['drvs', 'drvf'] + ['drvs' + num for num in self.drvnums]:
                 accepted, response = self.drc.send_command(recorder, 'start', mjd=mjd, mpm=mpm)
                 if duration is not None:
                     if response['status'] != 'success':
                         logger.warn("Data recorder not started successfully. Trying to schedule stop...")
                     stop = start + TimeDelta(duration/1e3/24/3600, format='jd')
                     self.stop_dr(recorders=recorder, t0=stop)
+            else:
+                print(f"recorder name {recorder} not recognized.")
+                accepted = False
 
             if not accepted:
                 logger.warn(f"no response from {recorder}")
