@@ -551,10 +551,14 @@ class BeamTracker(object):
             pass
 
 
-def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4, cal_directory='/home/ubuntu/mmanders/caltables/latest/', etcdhost=ETCD_HOST):
+def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4,
+                         cal_directory='/home/ubuntu/mmanders/caltables/latest/', force=False,
+                         etcdhost=ETCD_HOST):
     """
     Wraper to create a new BeamPointingControl instance and load bandpass
     calibration data from a directory.
+    cal_directory is where to look for tables to be applied.
+    force will require (un)application of tables, even if the beam already has it set.
     """
     
     # Create the instance
@@ -564,19 +568,22 @@ def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4, 
                                            npipeline_per_server=npipeline_per_server,
                                            station=ovro,
                                            etcdhost=etcdhost)
-    
+
     # Find the calibration files
-    if cal_directory == '/pathshouldnotexist':
-        calfiles = []
-    else:
-        calfiles = glob.glob(os.path.join(cal_directory, '*.bcal'))
-        calfiles.sort()
-        if len(calfiles) == 0:
-            logger.warn(f"No calibration data found in '{cal_directory}'")
+    if not control_instance.cal_set or force == True:
+        if cal_directory == '/pathshouldnotexist':
+            calfiles = []
+        else:
+            calfiles = glob.glob(os.path.join(cal_directory, '*.bcal'))
+            calfiles.sort()
+            if len(calfiles) == 0:
+                logger.warn(f"No calibration data found in '{cal_directory}'")
         
-    # Load the calibration data, if found
-    for calfile in calfiles:
-        control_instance.set_beam_calibration(calfile)
+        # Load the calibration data, if found
+        for calfile in calfiles:
+            control_instance.set_beam_calibration(calfile)
+    else:
+        logger.info(f"Calibration already set for beam {beam}. To overload, use force=True")
        
     # Start up the data flow
     control_instance.set_beam_dest()
