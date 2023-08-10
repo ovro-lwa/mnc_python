@@ -418,13 +418,14 @@ class Controller():
         self.pcontroller.stop_pipelines()
         time.sleep(20)
 
-    def start_dr(self, recorders=None, t0='now', duration=None, time_avg=1):
+    def start_dr(self, recorders=None, t0='now', duration=None, time_avg=1, teng_f1=None, teng_f2=None):
         """ Start data recorders listed recorders.
         Defaults to starting those listed in configuration file.
         Recorder list can be overloaded with 'drvs' (etc) or individual recorders (e.g., 'drvs7601').
         t0 is either 'now' or a start time (astropy Time, mjd float, and isot strings supported).
         duration is length of data recording in milliseconds (required for power beam recording; optional for visibilities).
         time_avg is power beam averaging time in milliseconds (integer converted to next lower power of 2).
+        teng_f1/2 are the central frequencies of t-engine tunings in units of Hz.
         """
 
         dconf = self.conf['dr']
@@ -467,19 +468,33 @@ class Controller():
                     logger.warn("Power beam recordings require a duration")
 
             elif recorder in [f'drt{n}' for n in range(1,3)]:
+                assert teng_f1 is not None and teng_f2 is not None, "Need to set teng_f1, teng_f2 frequencies"
                 if duration is not None:
-                    assert isinstance(time_avg, int)
-                    time_avg = 2 ** int(np.log2(time_avg))  # set to next lower power of 2
-                accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd,
-                                                           start_mpm=mpm, duration_ms=duration,
-                                                           time_avg=time_avg)
+                    assert time_avg in [None, 0, 1], "No time averaging can be done for t-engine"
 
-            elif recorder in ['drvs', 'drvf'] + ['drvs' + num for num in self.drvnums]:
-                accepted, response = self.drc.send_command(recorder, 'start', mjd=mjd, mpm=mpm)
+                accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd,
+                                                           start_mpm=mpm, duration_ms=duration)
+                beam = int(recorder[3:])
+
+                # central_freq defined in units of 196e9/2**32
+                teng_f1n = int(teng_f1/(196e9/2**32))
+                teng_f2n = int(teng_f2/(196e9/2**32))
+
+                # TODO: what is filter?
+                # TODO: decide if gain needs to be tunable
+                gain = 1
+                f0 = None
+                dr.send_command(f"drt{beam}", "drx",
+                                beam=beam, tuning=1, central_freq=teng_f1n, filter=f0, gain=gain)
+                dr.send_command(f"drt{beam}", "drx",
+                                beam=beam, tuning=2, central_freq=teng_f2n, filter=f0, gain=gain)
+
+            elif recorder in ["drvs", "drvf"] + ["drvs" + num for num in self.drvnums]:
+                accepted, response = self.drc.send_command(recorder, "start", mjd=mjd, mpm=mpm)
                 if duration is not None:
-                    if response['status'] != 'success':
+                    if response["status"] != "success":
                         logger.warn("Data recorder not started successfully. Trying to schedule stop...")
-                    stop = start + TimeDelta(duration/1e3/24/3600, format='jd')
+                    stop = start + TimeDelta(duration/1e3/24/3600, format="jd")
                     self.stop_dr(recorders=recorder, t0=stop)
             else:
                 print(f"recorder name {recorder} not recognized.")
