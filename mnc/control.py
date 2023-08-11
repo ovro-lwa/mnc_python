@@ -418,7 +418,7 @@ class Controller():
         self.pcontroller.stop_pipelines()
         time.sleep(20)
 
-    def start_dr(self, recorders=None, t0='now', duration=None, time_avg=1, teng_f1=None, teng_f2=None):
+    def start_dr(self, recorders=None, t0='now', duration=None, time_avg=1, teng_f1=None, teng_f2=None, f0=1):
         """ Start data recorders listed recorders.
         Defaults to starting those listed in configuration file.
         Recorder list can be overloaded with 'drvs' (etc) or individual recorders (e.g., 'drvs7601').
@@ -426,6 +426,7 @@ class Controller():
         duration is length of data recording in milliseconds (required for power beam recording; optional for visibilities).
         time_avg is power beam averaging time in milliseconds (integer converted to next lower power of 2).
         teng_f1/2 are the central frequencies of t-engine tunings in units of Hz.
+        f0 sets bandwidth as integer from 1 (250kHz) to 7 (19.6MHz).
         """
 
         dconf = self.conf['dr']
@@ -472,23 +473,21 @@ class Controller():
                 if duration is not None:
                     assert time_avg in [None, 0, 1], "No time averaging can be done for t-engine"
 
-                accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd,
-                                                           start_mpm=mpm, duration_ms=duration)
                 beam = int(recorder[3:])
+                accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd, beam=beam,
+                                                           start_mpm=mpm, duration_ms=duration)
 
                 # central_freq defined in units of 196e9/2**32
                 teng_f1n = int(teng_f1/(196e9/2**32))
                 teng_f2n = int(teng_f2/(196e9/2**32))
 
-                # TODO: what is filter?
-                # TODO: decide if gain needs to be tunable
-                gain = 1
-                f0 = None
-                dr.send_command(f"drt{beam}", "drx",
-                                beam=beam, tuning=1, central_freq=teng_f1n, filter=f0, gain=gain)
-                dr.send_command(f"drt{beam}", "drx",
-                                beam=beam, tuning=2, central_freq=teng_f2n, filter=f0, gain=gain)
-
+                gain = 1      # TODO: decide if gain needs to be tunable
+                accepted, response = self.drc.send_command(f"drt{beam}", "drx", beam=beam, tuning=1,
+                                                           central_freq=teng_f1n, filter=f0, gain=gain)
+                if accepted:
+                    accepted, response = self.drc.send_command(f"drt{beam}", "drx", beam=beam, tuning=2,
+                                                               central_freq=teng_f2n, filter=f0, gain=gain)
+                    
             elif recorder in ["drvs", "drvf"] + ["drvs" + num for num in self.drvnums]:
                 accepted, response = self.drc.send_command(recorder, "start", mjd=mjd, mpm=mpm)
                 if duration is not None:
