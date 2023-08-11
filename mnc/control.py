@@ -470,23 +470,28 @@ class Controller():
 
             elif recorder in [f'drt{n}' for n in range(1,3)]:
                 assert teng_f1 is not None and teng_f2 is not None, "Need to set teng_f1, teng_f2 frequencies"
+                assert teng_f1 < 196e6/2 and teng_f2 < 196e6/2, "t-engine tuning frequency too high."
                 if duration is not None:
                     assert time_avg in [None, 0, 1], "No time averaging can be done for t-engine"
 
                 beam = int(recorder[3:])
-                accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd, beam=beam,
-                                                           start_mpm=mpm, duration_ms=duration)
 
-                # central_freq defined in units of 196e9/2**32
-                teng_f1n = int(teng_f1/(196e9/2**32))
-                teng_f2n = int(teng_f2/(196e9/2**32))
+                # central_freq defined in units of 196e9/2**32  OR NOT?
+#                teng_f1n = int(teng_f1/(196e6/2**32))
+#                teng_f2n = int(teng_f2/(196e6/2**32))
 
                 gain = 1      # TODO: decide if gain needs to be tunable
-                accepted, response = self.drc.send_command(f"drt{beam}", "drx", beam=beam, tuning=1,
-                                                           central_freq=teng_f1n, filter=f0, gain=gain)
-                if accepted:
-                    accepted, response = self.drc.send_command(f"drt{beam}", "drx", beam=beam, tuning=2,
-                                                               central_freq=teng_f2n, filter=f0, gain=gain)
+                accepted1, response = self.drc.send_command(f"drt{beam}", "drx", beam=beam, tuning=1,
+                                                           central_freq=teng_f1, filter=f0, gain=gain)
+                if accepted1:
+                    accepted2, response = self.drc.send_command(f"drt{beam}", "drx", beam=beam, tuning=2,
+                                                               central_freq=teng_f2, filter=f0, gain=gain)
+
+                if accepted1 and accepted2:
+                    accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd, beam=beam,
+                                                               start_mpm=mpm, duration_ms=duration)
+                else:
+                    logger.warn("tengine tuning command(s) not successful. Not starting data recorder.")
                     
             elif recorder in ["drvs", "drvf"] + ["drvs" + num for num in self.drvnums]:
                 accepted, response = self.drc.send_command(recorder, "start", mjd=mjd, mpm=mpm)
