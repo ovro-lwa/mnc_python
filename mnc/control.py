@@ -170,16 +170,19 @@ class Controller():
                 else:
                     logger.info('All snaps already programmed.')
 
-                ec.send_command(0, 'feng', 'cold_start_from_config', kwargs={'config_file': self.config_file,
-                                                                             'program': False, 'initialize': True},
-                                timeout=60*5, n_response_expected=11)
+                for snap2name in snap2names:
+                    print(f"Initializing board {snap2name}")
+                    snap2num = int(snap2name.lstrip('snap'))
+                    ec.send_command(snap2num, 'feng', 'cold_start_from_config',
+                                    kwargs={'config_file': self.config_file, 'program': False, 'initialize': True},
+                                    timeout=20)
 
             else:
                 for snap2name in snap2names:
                     snap2num = int(snap2name.lstrip('snap'))
                     if (not all(is_programmed.values()) or force) and program:
                         ec.send_command(snap2num, 'feng', 'program', timeout=60, n_response_expected=1)
-                        ec.send_command(snap2num, 'feng', 'initialize', kwargs={'read_only':False}, timeout=30, n_response_expected=1)
+                        ec.send_command(snap2num, 'feng', 'initialize', kwargs={'read_only':False}, timeout=60, n_response_expected=1)
                     else:
                         logger.info(f'{snap2name} already programmed.')
 
