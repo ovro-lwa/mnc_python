@@ -219,11 +219,12 @@ class Controller():
 
         return timestamp, stats
 
-    def configure_xengine(self, recorders=None, calibratebeams=False, full=False, timeout=300):
+    def configure_xengine(self, recorders=None, calibratebeams=False, full=False, timeout=300, force=False):
         """ Restart xengine. Configure pipelines to send data to recorders.
         Recorders is list of recorders to configure output to. Defaults to those in config file.
         Supported recorders are "drvs" (slow vis), "drvf" (fast vis), "dr[n]" (power beams), "drt1" (teng)
         Option "full" will stop/start/clear pipelines/beamformer controllers.
+        force will apply beam calibration, even if already applied in x-engines.
         timeout is for x-engine start_pipelines method.
         """
 
@@ -263,7 +264,7 @@ class Controller():
                                                                                 nserver=len(self.xhosts_up),
                                                                                 npipeline_per_server=self.npipeline,
                                                                                 cal_directory=cal_directory,
-                                                                                etcdhost=self.etcdhost)
+                                                                                etcdhost=self.etcdhost, force=force)
             except KeyError:
                 logger.error("KeyError when creating beamformer control. Are data being sent from f to x-engines?")
 
