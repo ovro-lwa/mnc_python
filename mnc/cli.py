@@ -24,8 +24,7 @@ def load_settings(filename):
     """ Load ARX and F-engine settings
     """
 
-    ss = settings.Settings(filename)
-    ss.load_all()
+    settings.runall(filename)
 
 
 @cli.command()
