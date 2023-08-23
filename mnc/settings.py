@@ -226,7 +226,7 @@ class Settings():
 
 
 
-def runall(filename="data/20230721-settingsAll-night.mat"):
+def update(filename="data/20230721-settingsAll-night.mat"):
     settings = Settings(filename)
     settings.load_feng()
     settings.load_arx()
