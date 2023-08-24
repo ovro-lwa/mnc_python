@@ -1,7 +1,29 @@
 import click
 from mnc import settings, control
-from mnc import myarx as a
-import sigtab as s
+from mnc import myarx
+
+
+# mapping larry's proposed analog and digital numbering
+def a2arx(asig):
+    """ asig to ARX address and ARX channel number
+    """
+    
+    adr = int(asig/16)
+    chan = asig - 16*adr + 1  # channel number is 1-based
+    adr += 1                  # address is 1-based
+    return(adr,chan)
+
+
+def name2sig(name):
+    i=0
+    while i<len(antNames):
+        if antNames[i]==name:
+            break
+        i = i+1
+    if i<len(antNames):
+        return(sigtab[i])
+    else:
+        return(None)
 
 @click.group('lwamnc')
 def cli():
@@ -13,9 +35,9 @@ def arx_off(antpol):
     """ Turn off ARX front end for a specific ant-pol.
     """
 
-    asig = s.name2sig(antpol)[0]
-    arx = s.a2arx(asig)
-    a.feeOff(arx[0],arx[1])
+    asig = name2sig(antpol)[0]
+    arx = a2arx(asig)
+    myarx.feeOff(arx[0], arx[1])
 
 
 @cli.command()
