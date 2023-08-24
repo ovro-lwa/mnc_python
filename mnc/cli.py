@@ -60,3 +60,9 @@ def print_gonogo(subsystem):
     pass
 
 
+@cli.command()
+def rfi_summary():
+    """ Use f-engine to create summary of antenna and RFI issues
+    """
+
+    pass
