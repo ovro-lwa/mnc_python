@@ -40,7 +40,7 @@ def load_settings(filename):
 
 
 @cli.command()
-@click.option('--subsystem')
+@click.option('--subsystem', default=None)
 def print_gonogo(subsystem):
     """ Check all subsystems and print the go/no-go status for each one.
     This is meant to summarize observing state, but for more detail, check the System Health Dashboard.
@@ -49,48 +49,59 @@ def print_gonogo(subsystem):
 
     from mnc import mcs, control
     from astropy import time
-    from dsautils import dsa_store
-    from dateutil.parser import parse
 
-    ls = dsa_store.DsaStore()
-    con = control.Controller()
     t_stale = 10
+    con = None
 
-    recorders = con.conf['dr']['recorders'].copy()
-    if 'drvs' in recorders:
-        recorders.remove('drvs')
-        for num in con.drvnums[::2]:  # one per pair
-            recorders.append('drvs'+str(num))
-
-    if 'drvf' in recorders:
-        recorders.remove('drvf')
-        for num in con.drvnums[::2]:  # one per pair
-            recorders.append('drvf'+str(num))
+    if subsystem in ['feng', None]:
+        from dateutil.parser import parse
+        from dsautils import dsa_store
+        ls = dsa_store.DsaStore()
+        status_f =  []
+        for snapnum in range(1, 12):
+            status = ls.get_dict(f'/mon/snap/{snapnum:02}/status')
+            t_age = time.Time.now().unix-time.Time(parse(status['timestamp'])).unix
+            status_f.append((str(snapnum), (status['ok'] and t_age < t_stale)))
+    else:
+        status_f = None
     
-    status_f =  []
-    for snapnum in range(1, 12):
-        status = ls.get_dict(f'/mon/snap/{snapnum:02}/status')
-        t_age = time.Time.now().unix-time.Time(parse(status['timestamp'])).unix
-        status_f.append((str(snapnum), (status['ok'] and t_age < t_stale)))
-    
-    status_x = []
-    hostids = [f'{pp.host[-2:]}{pp.pipeline_id}' for pp in con.pipelines]
-    for host in con.xhosts:
-        for ii in range(con.npipeline):
-            hostid = host[-2:] + str(ii)
-            if hostid in hostids:
-                pp = con.pipelines[hostids.index(hostid)]
-                t_age = time.Time.now().unix-pp.capture.get_bifrost_status()['time']
-                rate = pp.capture.get_bifrost_status()['gbps']
-                status_x.append((hostid, (rate > 10 and t_age < t_stale)))
-            else:
-                status_x.append((hostid, False))
+    if subsystem in ['xeng', None]:
+        con = control.Controller()
+        status_x = []
+        hostids = [f'{pp.host[-2:]}{pp.pipeline_id}' for pp in con.pipelines]
+        for host in con.xhosts:
+            for ii in range(con.npipeline):
+                hostid = host[-2:] + str(ii)
+                if hostid in hostids:
+                    pp = con.pipelines[hostids.index(hostid)]
+                    t_age = time.Time.now().unix-pp.capture.get_bifrost_status()['time']
+                    rate = pp.capture.get_bifrost_status()['gbps']
+                    status_x.append((hostid, (rate > 10 and t_age < t_stale)))
+                else:
+                    status_x.append((hostid, False))
+    else:
+        status_x = None
 
-    status_dr = []
-    for dr in recorders:
-        summary = mcs.Client(dr).read_monitor_point('summary')
-        t_age = time.Time.now().unix-summary.timestamp
-        status_dr.append((dr.lstrip('dr'), (summary.value == 'normal' and t_age < t_stale)))
+    if subsystem in ['dr', None]:
+        if con is None:
+            con = control.Controller()
+        recorders = con.conf['dr']['recorders'].copy()
+        if 'drvs' in recorders:
+            recorders.remove('drvs')
+            for num in con.drvnums[::2]:  # one per pair
+                recorders.append('drvs'+str(num))
+
+        if 'drvf' in recorders:
+            recorders.remove('drvf')
+            for num in con.drvnums[::2]:  # one per pair
+                recorders.append('drvf'+str(num))
+        status_dr = []
+        for dr in recorders:
+            summary = mcs.Client(dr).read_monitor_point('summary')
+            t_age = time.Time.now().unix-summary.timestamp
+            status_dr.append((dr.lstrip('dr'), (summary.value == 'normal' and t_age < t_stale)))
+    else:
+        status_dr = None
 
     return status_f, status_x, status_dr
 
@@ -100,4 +111,4 @@ def rfi_summary():
     """ Use f-engine to create summary of antenna and RFI issues
     """
 
-    pass
+    raise NotImplementedError
