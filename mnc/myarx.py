@@ -4,6 +4,12 @@
 # 20221014 - revise status_asig() not to get rfPowerOffset if provided by caller.
 # 20221017 - fix raw() function so that return value is never undefined.
 # 20221029 - change chanCode() to round rather than truncate attenuator values that are not 0.5dB multiples.
+# 20230306 - Add feeOn() function.
+# 20230307 - Make header line printing optional in status() and status_asig().
+# 20230625 - rfPowerOffset(): keep log of results whenever it is run.
+# 20230628 - feeOn(), feeOff():  add option to control a single channel.
+# 20230809 - fix bugs in feeOn() and feeOff() for single-channel control.
+
 
 import lwautils.lwa_arx
 import sys
@@ -14,6 +20,7 @@ import warnings
 arx = lwautils.lwa_arx.ARX()
 
 adrs = range(15,46)  #addresses of ARX boards (rollout phase 3)
+RFPOWEROFFSETLOG = '/home/ldaddario/arxPowerOffsets.log'
 
 def raw(adr,cmd):
     r = []
@@ -33,6 +40,7 @@ def owte(adr):
     r = arx.raw(adr,'OWTE',1.1)
     d = [int(r[i:i+4],16)/16 for i in range(0,len(r),4)]
     return d
+
 def temp(adr):
     r = arx.raw(adr,'TEMP')
     return int(r[1:5],16)/10
@@ -55,6 +63,12 @@ def rfPowerOffset(adr):
     r = arx.raw(adr,'SETS0001')   #set all channels off and max attenuation
     offsets = raw2int(adr,'POWA') #read detectors
     r = arx.raw(adr,'SETA'+set)   #restore original configuration
+    try:
+        r = arx.raw(adr,'ARXN') # get serial number of board
+        sn = int(r[:4],16)
+        with open(RFPOWEROFFSETLOG,'a') as f:
+            print(adr,time.time(),sn,str(offsets).strip('[]'), sep=',',file=f)
+    except: pass
     return offsets
 
 def rfPowerSave(adr,offsets,fileprefix=''):
@@ -118,11 +132,28 @@ def presenceCheck(first=1,last=126):
             pass
     return(good)
 
-def feeOff(adr):   # Turn off all front ends of an ARX board.
-    c = np.array(raw2int(adr,'GETA')) & 0x7FFF
-    for i in range(len(c)):
-        code = '{:04X}'.format(c[i])
-        arx.raw(adr,'SETC'+'%1X'%(i)+code)
+def feeOff(adr,chan=0):  # Turn off all front ends of an ARX board, or just one chan.
+    if chan:
+        chi = '%1X'%(chan-1)
+        c = raw2int(adr,'GETC'+chi)[0] & 0x7FFF
+        arx.raw(adr,'SETC'+chi+'%4X'%c)
+    else:
+        c = np.array(raw2int(adr,'GETA')) & 0x7FFF
+        for i in range(len(c)):
+            code = '{:04X}'.format(c[i])
+            arx.raw(adr,'SETC'+'%1X'%(i)+code)
+    return(True)
+
+def feeOn(adr,chan=0):
+    if chan:
+        chi = '%1X'%(chan-1)
+        c = raw2int(adr,'GETC'+chi)[0] | 0x8000
+        arx.raw(adr,'SETC'+chi+'%4X'%c)
+    else:
+        c = np.array(raw2int(adr,'GETA')) | 0x8000
+        for i in range(len(c)):
+            code = '{:04X}'.format(c[i])
+            arx.raw(adr,'SETC'+'%1X'%(i)+code)
     return(True)
 
 def at2add(adr,dB):  # Add given value to AT2 settings for all channels of ARX board
@@ -191,21 +222,22 @@ def dsig2feng(digitalSignal): # From digital sig num calculate F-unit location a
     fsig = digitalSignal % 64              # FPGA signal number, 0:63
     return (funit,fsig)
 
-def status(adr,offsets=[],pr=True):
+def status(adr,offsets=[],pr=True,header=False):
     # status(): print status report for all channels of one or more ARX boards
     # pr=False to suppress printing
     # returns:
     # [[analogSigNr, arxAdr, arxCh, AT1,AT2,filter,biasOn, current_mA, rfPower_W],...]
     warnings.simplefilter('ignore') # ignore all warnings (esp. divide by 0)
     stat = []
-    if pr: print('sig','adr','ch','config','I/mA','P/dBm')
+    if pr and header: print('sig','adr','ch','config','I/mA','P/dBm')
     if not isinstance(adr,list):
         adr=[adr]
     #print('myarx.status.adr:',adr)
     for i in range(len(adr)):
         a = adr[i]
-        if len(offsets)<len(adr): o = rfPowerOffset(a)
-        else:                     o = offsets[i]
+        if len(adr) < 2:            o = offsets
+        elif len(offsets)<len(adr): o = rfPowerOffset(a)
+        else:                       o = offsets[i]
         #print('myarx.status.o:',o)
         p = rfPower(a,o)
         I = 0.4*np.array(raw2int(a,'CURA'))
@@ -217,7 +249,7 @@ def status(adr,offsets=[],pr=True):
 
     return np.array(stat)                        
 
-def status_asig(asig,pr=True,offsets=[]):
+def status_asig(asig,pr=True,offsets=[],header=False):
     # Optional parameters:
     #   offsets:  rfPowerOffsets; if not provided, will be measured here.
     #   pr:  print to stdout if True, otherwise don't print.
@@ -230,7 +262,12 @@ def status_asig(asig,pr=True,offsets=[]):
     I = 0.4*np.array(raw2int(a,'CURA'))
     r = raw2int(a,'GETA')
     cfg = chanDecode(r[c])
-    if pr: print('sig','adr','ch','config','I/mA','P/dBm')
+    if pr and header: print('sig','adr','ch','config','I/mA','P/dBm')
     if pr: print(asig,a,c+1,chanDecode(r[c]),format(I[c],'.1f'),format(10*np.log10(p[c])+30,'.2f'))
     return [asig,cfg[0],cfg[1],cfg[2],cfg[3],I[c],p[c]]
 
+def set_asig(asig,at1,at2,filter,inputOn):
+    # Configure one channel by asig number
+    loc = asig2arx(asig)
+    code = chanCode(at1,at2,filter,inputOn)
+    raw(loc[0],'SETC' + '%1X' % (loc[1]-1) + code)

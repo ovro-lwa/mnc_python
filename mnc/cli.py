@@ -1,33 +1,12 @@
 import click
 from mnc import settings, control
 from mnc import myarx
-
-
-# mapping larry's proposed analog and digital numbering
-def a2arx(asig):
-    """ asig to ARX address and ARX channel number
-    """
-    
-    adr = int(asig/16)
-    chan = asig - 16*adr + 1  # channel number is 1-based
-    adr += 1                  # address is 1-based
-    return(adr,chan)
-
-
-def name2sig(name):
-    i=0
-    while i<len(antNames):
-        if antNames[i]==name:
-            break
-        i = i+1
-    if i<len(antNames):
-        return(sigtab[i])
-    else:
-        return(None)
+from lwa_antpos import mapping
 
 @click.group('lwamnc')
 def cli():
     pass
+
 
 @cli.command()
 @click.argument('antpol')
@@ -35,9 +14,20 @@ def arx_off(antpol):
     """ Turn off ARX front end for a specific ant-pol.
     """
 
-    asig = name2sig(antpol)[0]
-    arx = a2arx(asig)
-    myarx.feeOff(arx[0], arx[1])
+    assert 'A' in antpol.upper() or 'B' in antpol.upper()
+    address, channel = mapping.antpol_to_arx(antpol[:-1], antpol[-1])
+    myarx.feeOff(address, channel)
+
+
+@cli.command()
+@click.argument('antpol')
+def arx_on(antpol):
+    """ Turn on ARX front end for a specific ant-pol.
+    """
+
+    assert 'A' in antpol.upper() or 'B' in antpol.upper()
+    address, channel = mapping.antpol_to_arx(antpol[:-1], antpol[-1])
+    myarx.feeOn(address, channel)
 
 
 @cli.command()
@@ -46,7 +36,7 @@ def load_settings(filename):
     """ Load ARX and F-engine settings
     """
 
-    settings.runall(filename)
+    settings.update(filename)
 
 
 @cli.command()
@@ -57,7 +47,52 @@ def print_gonogo(subsystem):
     May optionally print status of a single subsystem (feng, xeng, dr).
     """
 
-    pass
+    from mnc import mcs, control
+    from astropy import time
+    from dsautils import dsa_store
+    from dateutil.parser import parse
+
+    ls = dsa_store.DsaStore()
+    con = control.Controller()
+    t_stale = 10
+
+    recorders = con.conf['dr']['recorders'].copy()
+    if 'drvs' in recorders:
+        recorders.remove('drvs')
+        for num in con.drvnums[::2]:  # one per pair
+            recorders.append('drvs'+str(num))
+
+    if 'drvf' in recorders:
+        recorders.remove('drvf')
+        for num in con.drvnums[::2]:  # one per pair
+            recorders.append('drvf'+str(num))
+    
+    status_f =  []
+    for snapnum in range(1, 12):
+        status = ls.get_dict(f'/mon/snap/{snapnum:02}/status')
+        t_age = time.Time.now().unix-time.Time(parse(status['timestamp'])).unix
+        status_f.append((str(snapnum), (status['ok'] and t_age < t_stale)))
+    
+    status_x = []
+    hostids = [f'{pp.host[-2:]}{pp.pipeline_id}' for pp in con.pipelines]
+    for host in con.xhosts:
+        for ii in range(con.npipeline):
+            hostid = host[-2:] + str(ii)
+            if hostid in hostids:
+                pp = con.pipelines[hostids.index(hostid)]
+                t_age = time.Time.now().unix-pp.capture.get_bifrost_status()['time']
+                rate = pp.capture.get_bifrost_status()['gbps']
+                status_x.append((hostid, (rate > 10 and t_age < t_stale)))
+            else:
+                status_x.append((hostid, False))
+
+    status_dr = []
+    for dr in recorders:
+        summary = mcs.Client(dr).read_monitor_point('summary')
+        t_age = time.Time.now().unix-summary.timestamp
+        status_dr.append((dr.lstrip('dr'), (summary.value == 'normal' and t_age < t_stale)))
+
+    return status_f, status_x, status_dr
 
 
 @cli.command()

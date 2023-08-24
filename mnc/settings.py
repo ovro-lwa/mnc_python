@@ -5,21 +5,27 @@ import numpy as np
 import getpass
 
 from mnc import myarx as a
-from lwa_f import snap2_feng_etcd_client
+from mnc import common
+
 
 # Constants
 DELAY_OFFSET = 10 # minimum delay
 ADC_CLOCK = 196000000    # sampling clock frequency, Hz
-ETCDHOST = 'etcdv3service.sas.pvt'
 snaps = range(1,12)
+
+logger = common.get_logger(__name__)
 
 def dsig2feng(digitalSignal): # From digital sig num calculate F-unit location and signal
     funit = int(digitalSignal/64) + 1  # location, 1:11
     fsig = digitalSignal % 64          # FPGA signal number, 0:63
     return (funit,fsig)
 
-ec = snap2_feng_etcd_client.Snap2FengineEtcdControl(ETCDHOST)
-print('Connected to ETCD host %s' % ETCDHOST)
+try:
+    from lwa_f import snap2_feng_etcd_client
+    ec = snap2_feng_etcd_client.Snap2FengineEtcdControl(common.ETCD_HOST)
+    print('Connected to ETCD host %s' % common.ETCD_HOST)
+except ImportError:
+    logger.warning('No f-eng library found. Skipping.')
 
 
 class Settings():
