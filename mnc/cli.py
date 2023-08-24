@@ -1,6 +1,6 @@
 import click
 from mnc import settings, control
-import myarx as a
+from mnc import myarx as a
 import sigtab as s
 
 @click.group('lwamnc')
