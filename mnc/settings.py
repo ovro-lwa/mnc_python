@@ -38,6 +38,7 @@ class Settings():
             cfgkeys = config.keys()
         else:
 #            config = <read from etcd>
+            pass
 
     def load_feng(self):
         """ Load settings for f-engine to the SNAP2 boards.
