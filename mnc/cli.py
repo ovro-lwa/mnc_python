@@ -40,6 +40,16 @@ def load_settings(filename):
 
 
 @cli.command()
+@click.option('--full', default=False)
+def start_xengine(full):
+    """ Turn on x-engine with basic mnc-python interface
+    """
+
+    con = control.Controller()
+    con.configure_xengine(full=full)
+
+
+@cli.command()
 @click.option('--subsystem', default=None)
 def print_gonogo(subsystem):
     """ Check all subsystems and print the go/no-go status for each one.
