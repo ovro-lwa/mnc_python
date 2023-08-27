@@ -20,6 +20,17 @@ def dsig2feng(digitalSignal): # From digital sig num calculate F-unit location a
     fsig = digitalSignal % 64          # FPGA signal number, 0:63
     return (funit,fsig)
 
+
+def a2arx(asig): # asig to ARX address and ARX channel number
+    adr = int(asig/16)
+    chan = asig - 16*adr + 1  # channel number is 1-based
+    adr += 1                  # address is 1-based
+    return(adr,chan)
+
+
+isodd = lambda a: bool(a % 2)
+
+
 try:
     from lwa_f import snap2_feng_etcd_client
     ec = snap2_feng_etcd_client.Snap2FengineEtcdControl(common.ETCD_HOST)
@@ -183,22 +194,24 @@ class Settings():
         # SET UNUSED F INPUTS TO ZERO
         #----------------------------
 
-        print('SETTING UNUSED F ENG INPUTS TO ZERO.')
-        if 'unused' in cfgkeys:
-            unused = config['unused']
-        else:
-            unused = np.array([0]*704)
-        for i in range(704):
-            sig = dsig2feng(i)
-            if not sig[0] in snaps: continue       
-            snap_id = sig[0]
-            input_id = sig[1]
-            if unused[i]==True:
-                ec.send_command(snap_id, 'input', 'use_zero', kwargs={'stream':input_id})
-            else:
-                ec.send_command(snap_id, 'input', 'use_adc', kwargs={'stream':input_id})
+        print('TURNING OFF SPECIFIED SIGNALS')
+        off = []
+        if 'off' in cfgkeys:
+            off = config['off']
+            for dsig in off:
+                # Set F engine input to zero
+                feng = dsig2feng(dsig)
+                fpga = feng[0]
+                fsig = feng[1]
+                ec.send_command(fpga, 'input', 'use_zero', kwargs={'stream':int(fsig)})
 
-        print('Set',sum(unused),'inputs to use_zero and',sum(1-unused),'inputs to use_adc.')
+                # Turn off ARX input DC power (FEE or photodiode)
+                pol = 'B' if isodd(dsig) else 'A'
+                antname = mapping.correlator_to_antname(dsig//2)
+                address, channel = mapping.antpol_to_arx(antname, pol)
+                a.feeOff(address, channel)
+        print('Turned off',len(off),'signals: dsig=',off)        
+
 
     def load_arx(self):
         """ Load settings for ARX
