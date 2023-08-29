@@ -48,11 +48,15 @@ class Controller():
         self.npipeline = npipeline
         self.set_properties()
 
-        allowed = ['drvs', 'drvf'] + [f'dr{n}' for n in range(1,11)]  # correct input recorder names
+        allowed = ['drvs', 'drvf'] + [f'dr{n}' for n in range(1,11)] + ['drt1'] # correct input recorder names
         if recorders is not None:
             if isinstance(recorders, str):
                 recorders = [recorders]
-            recorders = [recorder for recorder in recorders if recorder in allowed]   # clean input
+            # clean input
+            disallowed = [recorder for recorder in recorders if recorder not in allowed]
+            if len(disallowed):
+                print(f'Removing unexpected recorder names: {disallowed}')
+                recorders = [recorder for recorder in recorders if recorder in allowed]
             self.conf['dr']['recorders'] = recorders
 
         # report
@@ -61,13 +65,15 @@ class Controller():
             modes.append('slow')
         if 'drvf' in self.conf['dr']['recorders']:
             modes.append('fast')
+        if 'drt1' in self.conf['dr']['recorders']:
+            modes.append('teng')
         for b in range(1, 11):
             if f"dr{b}" in self.conf['dr']['recorders']:
                 modes.append(f"beam{b}")
         logger.info(f"Loaded configuration for {self.nhosts} x-engine host(s) running {self.npipeline} pipeline(s) each")
         logger.info(f"Supported recorder modes are: {','.join(modes)}")
-        if 'beam2' in modes or 'beam3' in modes or 'beam4' in modes:
-            logger.info("\t Note: beams 2 (Solar), 3 (FRB), and 4 (Jovian) are reserved for specific science applications. Check with those teams before using them.")
+        if 'beam1' in modes or 'teng' in modes or 'beam2' in modes or 'beam3' in modes or 'beam4' in modes:
+            logger.info("\t Note: beams 1 and t-engine (VLBI/FRB), beam 2 (Solar), 3 (FRB), and 4 (Jovian) are reserved for specific science applications. Check with those teams before using them.")
         logger.info(f"etcd server being used is: {self.etcdhost}")
 
     @staticmethod
@@ -164,16 +170,19 @@ class Controller():
                 else:
                     logger.info('All snaps already programmed.')
 
-                ec.send_command(0, 'feng', 'cold_start_from_config', kwargs={'config_file': self.config_file,
-                                                                             'program': False, 'initialize': True},
-                                timeout=60*5, n_response_expected=11)
+                for snap2name in snap2names:
+                    print(f"Initializing board {snap2name}")
+                    snap2num = int(snap2name.lstrip('snap'))
+                    ec.send_command(snap2num, 'feng', 'cold_start_from_config',
+                                    kwargs={'config_file': self.config_file, 'program': False, 'initialize': True},
+                                    timeout=20)
 
             else:
                 for snap2name in snap2names:
                     snap2num = int(snap2name.lstrip('snap'))
                     if (not all(is_programmed.values()) or force) and program:
                         ec.send_command(snap2num, 'feng', 'program', timeout=60, n_response_expected=1)
-                        ec.send_command(snap2num, 'feng', 'initialize', kwargs={'read_only':False}, timeout=30, n_response_expected=1)
+                        ec.send_command(snap2num, 'feng', 'initialize', kwargs={'read_only':False}, timeout=60, n_response_expected=1)
                     else:
                         logger.info(f'{snap2name} already programmed.')
 
@@ -213,7 +222,7 @@ class Controller():
     def configure_xengine(self, recorders=None, calibratebeams=False, full=False, timeout=300):
         """ Restart xengine. Configure pipelines to send data to recorders.
         Recorders is list of recorders to configure output to. Defaults to those in config file.
-        Supported recorders are "drvs" (slow vis), "drvf" (fast vis), "dr[n]" (power beams)
+        Supported recorders are "drvs" (slow vis), "drvf" (fast vis), "dr[n]" (power beams), "drt1" (teng)
         Option "full" will stop/start/clear pipelines/beamformer controllers.
         timeout is for x-engine start_pipelines method.
         """
@@ -243,8 +252,8 @@ class Controller():
             cal_directory = '/pathshouldnotexist'
 
         for recorder in recorders:
-            # try to skip recorders not named "dr<n>"
-            if (len(recorder) != 3) and (recorder[:2] == 'dr'):
+            # skip vis recorders and assume dr1 sets appropriately for drt1
+            if recorder in ['drvs', 'drvf', 'drt1']:
                 continue
 
             num = int(recorder[2:])
@@ -412,13 +421,16 @@ class Controller():
         self.pcontroller.stop_pipelines()
         time.sleep(20)
 
-    def start_dr(self, recorders=None, t0='now', duration=None, time_avg=1):
+    def start_dr(self, recorders=None, t0='now', duration=None, time_avg=1, teng_f1=None, teng_f2=None, f0=1, gain1=1, gain2=1):
         """ Start data recorders listed recorders.
         Defaults to starting those listed in configuration file.
         Recorder list can be overloaded with 'drvs' (etc) or individual recorders (e.g., 'drvs7601').
         t0 is either 'now' or a start time (astropy Time, mjd float, and isot strings supported).
         duration is length of data recording in milliseconds (required for power beam recording; optional for visibilities).
         time_avg is power beam averaging time in milliseconds (integer converted to next lower power of 2).
+        teng_f1/2 are the central frequencies of t-engine tunings in units of Hz.
+        f0 sets bandwidth as integer from 1 (250kHz) to 7 (19.6MHz).
+        gain1/2 are gains on beamformers.
         """
 
         dconf = self.conf['dr']
@@ -450,28 +462,52 @@ class Controller():
             accepted = False
 
             # power beams
-            try:
-                num = int(recorder[2:], 10)
-                if recorder in [f'dr{n}' for n in range(1,11)]:
-                    if duration is not None:
-                        assert isinstance(time_avg, int)
-                        time_avg = 2 ** int(np.log2(time_avg))  # set to next lower power of 2
-                        accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd,
-                                                                   start_mpm=mpm, duration_ms=duration,
-                                                                   time_avg=time_avg)
-                    else:
-                        logger.warn("Power beam recordings require a duration")
-            except ValueError:
-                pass
-
-            # visibilities
-            if recorder in ['drvs', 'drvf'] + ['drvs' + num for num in self.drvnums]:
-                accepted, response = self.drc.send_command(recorder, 'start', mjd=mjd, mpm=mpm)
+            if recorder in [f'dr{n}' for n in range(1,11)]:
                 if duration is not None:
-                    if response['status'] != 'success':
+                    assert isinstance(time_avg, int)
+                    time_avg = 2 ** int(np.log2(time_avg))  # set to next lower power of 2
+                    accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd,
+                                                               start_mpm=mpm, duration_ms=duration,
+                                                               time_avg=time_avg)
+                else:
+                    logger.warn("Power beam recordings require a duration")
+
+            elif recorder in [f'drt{n}' for n in range(1,3)]:
+                assert teng_f1 is not None and teng_f2 is not None, "Need to set teng_f1, teng_f2 frequencies"
+                assert teng_f1 < 196e6/2 and teng_f2 < 196e6/2, "t-engine tuning frequency too high."
+                assert (f0 > 0) and (f0 < 8), "f0 (filter number) should be from 1-7 (inclusive)"
+                if duration is not None:
+                    assert time_avg in [None, 0, 1], "No time averaging can be done for t-engine"
+
+                beam = int(recorder[3:])
+
+                # central_freq defined in units of 196e9/2**32  OR NOT?
+#                teng_f1n = int(teng_f1/(196e6/2**32))
+#                teng_f2n = int(teng_f2/(196e6/2**32))
+
+                gain = 1      # TODO: decide if gain needs to be tunable
+                accepted1, response = self.drc.send_command(f"drt{beam}", "drx", beam=beam, tuning=1,
+                                                            central_freq=teng_f1, filter=f0, gain=gain1)
+                if accepted1:
+                    accepted2, response = self.drc.send_command(f"drt{beam}", "drx", beam=beam, tuning=2,
+                                                                central_freq=teng_f2, filter=f0, gain=gain2)
+
+                if accepted1 and accepted2:
+                    accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd, beam=beam,
+                                                               start_mpm=mpm, duration_ms=duration)
+                else:
+                    logger.warn("tengine tuning command(s) not successful. Not starting data recorder.")
+                    
+            elif recorder in ["drvs", "drvf"] + ["drvs" + num for num in self.drvnums]:
+                accepted, response = self.drc.send_command(recorder, "start", mjd=mjd, mpm=mpm)
+                if duration is not None:
+                    if response["status"] != "success":
                         logger.warn("Data recorder not started successfully. Trying to schedule stop...")
-                    stop = start + TimeDelta(duration/1e3/24/3600, format='jd')
+                    stop = start + TimeDelta(duration/1e3/24/3600, format="jd")
                     self.stop_dr(recorders=recorder, t0=stop)
+            else:
+                print(f"recorder name {recorder} not recognized.")
+                accepted = False
 
             if not accepted:
                 logger.warn(f"no response from {recorder}")
@@ -541,7 +577,7 @@ class Controller():
         for recorder in recorders:
             if recorder in ['drvs', 'drvf']:
                 accepted, response = self.drc.send_command(recorder, 'stop', mjd=mjd, mpm=mpm)
-            elif recorder[:2] == 'dr':
+            else:
                 accepted, response = self.drc.send_command(recorder, 'cancel', queue_number=queue_number)
 
             if not accepted:
