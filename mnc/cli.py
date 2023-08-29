@@ -1,7 +1,9 @@
 import click
 from mnc import settings, control
 from mnc import myarx
+from mnc.fengmon import get_new_spectra_autocorr
 from lwa_antpos import mapping
+import matplotlib.pyplot as plt
 
 @click.group('lwamnc')
 def cli():
@@ -117,8 +119,26 @@ def print_gonogo(subsystem):
 
 
 @cli.command()
-def rfi_summary():
+@click.argument('k')
+def rfi_summary(k):
     """ Use f-engine to create summary of antenna and RFI issues
     """
 
-    raise NotImplementedError
+    import matplotlib
+    matplotlib.use('module://drawilleplot')
+    spec = get_new_spectra_autocorr()
+    spclog = 10.*np.log10(spec)
+
+    f = plt.figure(figsize=(21,12))
+    ax = f.add_subplot(1,1,1)
+    plt.plot(np.linspace(0.,98.304,spclog.shape[1]),spclog[k*2,:].T,label=mapping.snap2_to_antpol((int(k*2/64))+1,int((k*2)%64)),linewidth=2,rasterized=True)
+    plt.plot(np.linspace(0.,98.304,spclog.shape[1]),spclog[k*2+1,:].T,label=mapping.snap2_to_antpol((int(k*2/64))+1,int((k*2)%64)+1),linewidth=2,rasterized=True)
+    plt.legend(loc='upper right',prop={'size': 20})
+    plt.xlabel('frequency [MHz]')
+    plt.ylabel('power')
+    plt.grid()
+    plt.xlim([0,98.304])
+
+    plt.tight_layout()
+    plt.show()
+    plt.close()

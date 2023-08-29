@@ -1,6 +1,7 @@
 import numpy as np
 
 from lwa_f import snap2_feng_etcd_client
+from lwa_f import snap2_fengine
 from mnc.common import ETCD_HOST
 
 etcdcontrol = snap2_feng_etcd_client.Snap2FengineEtcdControl(etcdhost=ETCD_HOST)
@@ -29,6 +30,29 @@ def get_new_spectra_autocorr():
                 pass
 
     return spec
+
+
+def adc_power(f,sigs):
+    """ Get array of f-engine ADC input power
+    """
+
+    ff = snap2_fengine.Snap2FengineEtcd('snap'+str(f).zfill(2))
+    d = np.array(ff.input.get_bit_stats())
+    var = d[1][sigs]-d[0][sigs]**2   #variance
+    var = [max(var[i],0) for i in range(len(var))]   # none < 0
+    std = np.sqrt(var)                                  #standard deviation
+    pd = [var[i]/512/512/100 for i in range(len(var))]  #power in watts
+    return((std,pd))
+
+
+def plotsomething():
+    """ Placeholder for plotting like Greg's rfi script
+    """
+
+    feng = range(1, 12)
+    pd = np.array([adc_power(i, range(64))[1] for i in feng])*1e3
+    today = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+    raise NotImplementedError
 
 
 def get_overflow_count_pfb():
