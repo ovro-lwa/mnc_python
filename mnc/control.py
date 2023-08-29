@@ -421,7 +421,7 @@ class Controller():
         self.pcontroller.stop_pipelines()
         time.sleep(20)
 
-    def start_dr(self, recorders=None, t0='now', duration=None, time_avg=1, teng_f1=None, teng_f2=None, f0=1):
+    def start_dr(self, recorders=None, t0='now', duration=None, time_avg=1, teng_f1=None, teng_f2=None, f0=1, gain1=1, gain2=1):
         """ Start data recorders listed recorders.
         Defaults to starting those listed in configuration file.
         Recorder list can be overloaded with 'drvs' (etc) or individual recorders (e.g., 'drvs7601').
@@ -430,6 +430,7 @@ class Controller():
         time_avg is power beam averaging time in milliseconds (integer converted to next lower power of 2).
         teng_f1/2 are the central frequencies of t-engine tunings in units of Hz.
         f0 sets bandwidth as integer from 1 (250kHz) to 7 (19.6MHz).
+        gain1/2 are gains on beamformers.
         """
 
         dconf = self.conf['dr']
@@ -474,6 +475,7 @@ class Controller():
             elif recorder in [f'drt{n}' for n in range(1,3)]:
                 assert teng_f1 is not None and teng_f2 is not None, "Need to set teng_f1, teng_f2 frequencies"
                 assert teng_f1 < 196e6/2 and teng_f2 < 196e6/2, "t-engine tuning frequency too high."
+                assert (f0 > 0) and (f0 < 8), "f0 (filter number) should be from 1-7 (inclusive)"
                 if duration is not None:
                     assert time_avg in [None, 0, 1], "No time averaging can be done for t-engine"
 
@@ -485,10 +487,10 @@ class Controller():
 
                 gain = 1      # TODO: decide if gain needs to be tunable
                 accepted1, response = self.drc.send_command(f"drt{beam}", "drx", beam=beam, tuning=1,
-                                                           central_freq=teng_f1, filter=f0, gain=gain)
+                                                            central_freq=teng_f1, filter=f0, gain=gain1)
                 if accepted1:
                     accepted2, response = self.drc.send_command(f"drt{beam}", "drx", beam=beam, tuning=2,
-                                                               central_freq=teng_f2, filter=f0, gain=gain)
+                                                                central_freq=teng_f2, filter=f0, gain=gain2)
 
                 if accepted1 and accepted2:
                     accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd, beam=beam,
