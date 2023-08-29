@@ -10,9 +10,9 @@ from lwautils import lwa_arx   # arx
 from lwa_antpos import mapping
 from astropy.time import Time, TimeDelta
 import time
+from mnc import settings, common
 
-from mnc.common import get_logger
-logger = get_logger(__name__)
+logger = common.get_logger(__name__)
 
 try:
     from lwa_f import snap2_fengine, helpers, snap2_feng_etcd_client  # fengine
@@ -146,11 +146,12 @@ class Controller():
         for adr in aconf['adrs']:
             ma.load_cfg(adr, preset)
 
-    def start_fengine(self, snap2names=None, initialize=False, program=False, force=False):
+    def start_fengine(self, snap2names=None, initialize=False, program=False, force=False, updatesettings=True):
         """ Start the fengines on all snap2s.
         snap2names argument allows a list of board names (e.g., ['snap02']), but defaults configuration file.
         Optionally can initialize and program, which will also run cold_start method regardless of current state.
         The config_file used should be available to the pipeline@lwacalimxx user (e.g., /home/pipeline/proj/lwa-shell/mnc_python/config/lwa...*yaml).
+        updatesettings will load the default settings file after initialization or programming.
         """
 
         fconf = self.conf['fengines']
@@ -190,6 +191,8 @@ class Controller():
                                                                                         'program': False,
                                                                                         'initialize': True},
                                     timeout=30, n_response_expected=1)
+            if updatesettings:
+                settings.update()
         else:
             if not all(is_programmed.values()):
                 logger.warn("Not all snaps are ready. \n Programmed: {is_programmed}.")
@@ -219,11 +222,12 @@ class Controller():
 
         return timestamp, stats
 
-    def configure_xengine(self, recorders=None, calibratebeams=False, full=False, timeout=300):
+    def configure_xengine(self, recorders=None, calibratebeams=False, full=False, timeout=300, force=False):
         """ Restart xengine. Configure pipelines to send data to recorders.
         Recorders is list of recorders to configure output to. Defaults to those in config file.
         Supported recorders are "drvs" (slow vis), "drvf" (fast vis), "dr[n]" (power beams), "drt1" (teng)
         Option "full" will stop/start/clear pipelines/beamformer controllers.
+        force will apply beam calibration, even if already applied in x-engines.
         timeout is for x-engine start_pipelines method.
         """
 
@@ -263,7 +267,7 @@ class Controller():
                                                                                 nserver=len(self.xhosts_up),
                                                                                 npipeline_per_server=self.npipeline,
                                                                                 cal_directory=cal_directory,
-                                                                                etcdhost=self.etcdhost)
+                                                                                etcdhost=self.etcdhost, force=force)
             except KeyError:
                 logger.error("KeyError when creating beamformer control. Are data being sent from f to x-engines?")
 

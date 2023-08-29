@@ -9,4 +9,8 @@ setup(name='mnc-python',
                         'myst-parser',
                         'setuptools_scm'],
       packages=['mnc'],
+      entry_points='''
+        [console_scripts]
+        lwamnc=mnc.cli:cli
+      ''',
       zip_safe=False)
