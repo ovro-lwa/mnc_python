@@ -3,14 +3,38 @@ import numpy as np
 from lwa_f import snap2_feng_etcd_client
 from lwa_f import snap2_fengine
 from mnc.common import ETCD_HOST
+from lwa_antpos import mapping
+
 
 etcdcontrol = snap2_feng_etcd_client.Snap2FengineEtcdControl(etcdhost=ETCD_HOST)
+isodd = lambda a: bool(a % 2)
 
 
 # wrap up some etcd feng monitoring commands.
 # function named after method of a block with suffix of block name (e.g., "_autocorr")
 
-def get_new_spectra_autocorr():
+def get_ant_autocorr(corrnum=None, antnum=None):
+    """ Gets pol A/B for a given corrnum or antnum
+    """
+
+    antname = None
+    if corrnum is None and antnum is not None:
+        antname = f'LWA-{antnum:03d}'
+    elif corrnum is not None and antnum is None:
+        antname = mapping.correlator_to_antname(corrnum)
+
+    assert antname is not None, "must define corrnum or antnum"
+
+    snapnum, snapinp = mapping.antpol_to_fpga(antname, 'A')
+    block = snapinp // 16
+    newspecs = etcdcontrol.send_command(snapnum, 'autocorr', 'get_new_spectra',
+                                        kwargs={'signal_block':block},
+                                        timeout=30, n_response_expected=1)
+
+    return np.array(newspecs[snapinp % 16]), np.array(newspecs[(snapinp % 16) + 1])
+
+
+def get_all_spectra_autocorr():
     """ Safe way to get f-engine spectra.
     Returns (n_ant-pol, n_chan) array of autocorrelation spectra.
     """
