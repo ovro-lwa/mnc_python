@@ -1,9 +1,10 @@
 import click
 from mnc import settings, control
 from mnc import myarx
-from mnc.fengmon import get_new_spectra_autocorr
+from mnc.fengmon import get_ant_autocorr
 from lwa_antpos import mapping
 import matplotlib.pyplot as plt
+import numpy as np
 
 @click.group('lwamnc')
 def cli():
@@ -119,26 +120,51 @@ def print_gonogo(subsystem):
 
 
 @cli.command()
-@click.argument('k')
-def rfi_summary(k):
+@click.option('--corrnum', default=None, type=int)
+@click.option('--antnum', default=None, type=int)
+@click.option('--ascii', default=False, is_flag=True, show_default=True)
+def plot_autocorr(corrnum, antnum, ascii):
     """ Use f-engine to create summary of antenna and RFI issues
+    corrnum ranges from 0-704.
+    antnum ranges from 0-352.
     """
 
     import matplotlib
-    matplotlib.use('module://drawilleplot')
-    spec = get_new_spectra_autocorr()
-    spclog = 10.*np.log10(spec)
+    if ascii:
+        matplotlib.use('module://drawilleplot')
+    else:
+        matplotlib.use('Agg')
 
-    f = plt.figure(figsize=(21,12))
-    ax = f.add_subplot(1,1,1)
-    plt.plot(np.linspace(0.,98.304,spclog.shape[1]),spclog[k*2,:].T,label=mapping.snap2_to_antpol((int(k*2/64))+1,int((k*2)%64)),linewidth=2,rasterized=True)
-    plt.plot(np.linspace(0.,98.304,spclog.shape[1]),spclog[k*2+1,:].T,label=mapping.snap2_to_antpol((int(k*2/64))+1,int((k*2)%64)+1),linewidth=2,rasterized=True)
-    plt.legend(loc='upper right',prop={'size': 20})
+    if corrnum is not None and antnum is None:
+        antname = mapping.correlator_to_antname(corrnum)
+    elif corrnum is None and antnum is not None:
+        antname = f"LWA-{antnum:03d}"
+
+    speca, specb = get_ant_autocorr(corrnum=corrnum, antnum=antnum)
+    spcloga = 10.*np.log10(speca)
+    spclogb = 10.*np.log10(specb)
+
+    f = plt.figure(figsize=(21, 12))
+    if ascii:
+        plt.subplot(211)
+        plt.plot(np.linspace(0., 98.304, len(spcloga)), spcloga, label=f'{antname}A', linewidth=5)
+        plt.legend(loc='upper right', prop={'size': 20})
+        plt.subplot(212)
+        plt.plot(np.linspace(0., 98.304, len(spclogb)), spclogb, label=f'{antname}B', linewidth=5)
+        plt.legend(loc='upper right', prop={'size': 20})
+    else:
+        plt.plot(np.linspace(0., 98.304, len(spcloga)), spcloga, label=f'{antname}A', linewidth=2, rasterized=True)
+        plt.plot(np.linspace(0., 98.304, len(spclogb)), spclogb, label=f'{antname}B', linewidth=2, rasterized=True)
+        plt.legend(loc='upper right', prop={'size': 20})
+
     plt.xlabel('frequency [MHz]')
     plt.ylabel('power')
     plt.grid()
-    plt.xlim([0,98.304])
+    plt.xlim([0, 98.304])
 
     plt.tight_layout()
-    plt.show()
+    if ascii:
+        plt.show()
+    else:
+        plt.savefig(f'{antname}.pdf')
     plt.close()
