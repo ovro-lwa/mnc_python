@@ -43,7 +43,7 @@ def load_settings(filename):
 
 
 @cli.command()
-@click.option('--full', default=False)
+@click.option('--full', is_flag=True, default=False, show_default=True)
 def start_xengine(full):
     """ Turn on x-engine with basic mnc-python interface
     """
