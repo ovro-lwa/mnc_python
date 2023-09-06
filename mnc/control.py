@@ -204,7 +204,6 @@ class Controller():
                                            timeout=30, n_response_expected=1)
                     if resp['val']['status'] == 'error':
                         raise RuntimeError(f"F-engine failure: {resp['val']['response']}")
-
         else:
             if not all(is_programmed.values()):
                 logger.warn("Not all snaps are ready. \n Programmed: {is_programmed}.")
