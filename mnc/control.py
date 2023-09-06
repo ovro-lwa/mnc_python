@@ -205,11 +205,12 @@ class Controller():
                     if resp['val']['status'] == 'error':
                         raise RuntimeError(f"F-engine failure: {resp['val']['response']}")
 
-            if updatesettings:
-                settings.update()
         else:
             if not all(is_programmed.values()):
                 logger.warn("Not all snaps are ready. \n Programmed: {is_programmed}.")
+
+        if updatesettings:
+            settings.update()
 
     def status_fengine(self):
         """ Use snap2 etcd client to poll for stats on each fengine.
