@@ -166,36 +166,50 @@ class Controller():
         if initialize or program:
             if snap2names == fconf['snap2s_inuse']:
                 if (not all(is_programmed.values()) or force) and program:
-                    ec.send_command(0, 'feng', 'program', timeout=60*7, n_response_expected=11, kwargs={'fpgfile': FPG_FILE})
-                    ec.send_command(0, 'feng', 'initialize', kwargs={'read_only':False}, timeout=60*5, n_response_expected=11)
+                    resp = ec.send_command(0, 'feng', 'program', timeout=60*11, n_response_expected=11, kwargs={'fpgfile': FPG_FILE})
+                    if resp['val']['status'] == 'error':
+                        raise RuntimeError(f"F-engine failure: {resp['val']['response']}")
+                    resp = ec.send_command(0, 'feng', 'initialize', kwargs={'read_only':False}, timeout=60*7, n_response_expected=11)
+                    if resp['val']['status'] == 'error':
+                        raise RuntimeError(f"F-engine failure: {resp['val']['response']}")
+
                 else:
                     logger.info('All snaps already programmed.')
 
                 for snap2name in snap2names:
                     print(f"Initializing board {snap2name}")
                     snap2num = int(snap2name.lstrip('snap'))
-                    ec.send_command(snap2num, 'feng', 'cold_start_from_config',
-                                    kwargs={'config_file': self.config_file, 'program': False, 'initialize': True},
-                                    timeout=20)
+                    resp = ec.send_command(snap2num, 'feng', 'cold_start_from_config',
+                                           kwargs={'config_file': self.config_file, 'program': False, 'initialize': True},
+                                           timeout=30)
+                    if resp['val']['status'] == 'error':
+                        raise RuntimeError(f"F-engine failure: {resp['val']['response']}")
 
             else:
                 for snap2name in snap2names:
                     snap2num = int(snap2name.lstrip('snap'))
                     if (not all(is_programmed.values()) or force) and program:
-                        ec.send_command(snap2num, 'feng', 'program', timeout=60, n_response_expected=1)
-                        ec.send_command(snap2num, 'feng', 'initialize', kwargs={'read_only':False}, timeout=60, n_response_expected=1)
+                        resp = ec.send_command(snap2num, 'feng', 'program', timeout=60, n_response_expected=1)
+                        if resp['val']['status'] == 'error':
+                            raise RuntimeError(f"F-engine failure: {resp['val']['response']}")
+                        resp = ec.send_command(snap2num, 'feng', 'initialize', kwargs={'read_only':False}, timeout=60, n_response_expected=1)
+                        if resp['val']['status'] == 'error':
+                            raise RuntimeError(f"F-engine failure: {resp['val']['response']}")
                     else:
                         logger.info(f'{snap2name} already programmed.')
 
-                    ec.send_command(snap2num, 'feng', 'cold_start_from_config', kwargs={'config_file': self.config_file,
-                                                                                        'program': False,
-                                                                                        'initialize': True},
-                                    timeout=30, n_response_expected=1)
-            if updatesettings:
-                settings.update()
+                    resp = ec.send_command(snap2num, 'feng', 'cold_start_from_config', kwargs={'config_file': self.config_file,
+                                                                                               'program': False,
+                                                                                               'initialize': True},
+                                           timeout=30, n_response_expected=1)
+                    if resp['val']['status'] == 'error':
+                        raise RuntimeError(f"F-engine failure: {resp['val']['response']}")
         else:
             if not all(is_programmed.values()):
                 logger.warn("Not all snaps are ready. \n Programmed: {is_programmed}.")
+
+        if updatesettings:
+            settings.update()
 
     def status_fengine(self):
         """ Use snap2 etcd client to poll for stats on each fengine.
@@ -313,7 +327,7 @@ class Controller():
             el = 90
 
         if num not in self.bfc:
-            msg = "Xengine not configured for beam {num}"
+            msg = f"Xengine not configured for beam {num}"
             logger.error(msg)
             raise KeyError(msg)
 

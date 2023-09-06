@@ -1,3 +1,5 @@
+import os.path
+import glob
 import sys
 import scipy.io as mat
 import time
@@ -7,6 +9,8 @@ import getpass
 from mnc import myarx as a
 from mnc import common
 
+DATAPATH = '/home/pipeline/proj/lwa-shell/mnc_python/data/'
+LATEST_SETTINGS = sorted([(fn, os.path.basename(fn).split('-')[0]) for fn in glob.glob(DATAPATH + '/*mat')], key=lambda x: x[1])[-1][0]
 
 # Constants
 DELAY_OFFSET = 10 # minimum delay
@@ -45,16 +49,17 @@ class Settings():
     Ultimately, can be generalized to include etcd reading.
     """
 
-    def __init__(self, filename=None):
+    def __init__(self, filename=LATEST_SETTINGS):
         """ Read configuration data file """
 
+        self.filename = filename
         if filename is not None:
-            config = mat.loadmat(filename, squeeze_me=True)
-            print('Read data file',sys.argv[1])
-            print('Data file internal time: ',time.asctime(time.gmtime(config['time'])))
-            cfgkeys = config.keys()
+            self.config = mat.loadmat(self.filename, squeeze_me=True)
+            print('Read data file', self.filename)
+            print('Data file internal time: ',time.asctime(time.gmtime(self.config['time'])))
+            self.cfgkeys = self.config.keys()
         else:
-#            config = <read from etcd>
+#            self.config = <read from etcd>
             pass
 
     def load_feng(self):
@@ -67,8 +72,8 @@ class Settings():
         # SET F ENGINE FFT SHIFT SCHEDULE
         #---------------------------------
 
-        if 'fftShift' in cfgkeys:
-            fftshift = config['fftShift']
+        if 'fftShift' in self.cfgkeys:
+            fftshift = self.config['fftShift']
         else:
             fftshift = 0x1FFC
 
@@ -81,13 +86,13 @@ class Settings():
         # LOAD F ENGINE EQUALIZATION FUNCTIONS
         #-------------------------------------
 
-        coef = config['coef']   # must include this key
+        coef = self.config['coef']   # must include this key
         dsigDone = []
         print('LOADING EQUALIZATION COEFFICIENTS')
 
         k = 'eq0'   # coax length = ref+-50m
-        if k in cfgkeys:
-            dsig = config[k]
+        if k in self.cfgkeys:
+            dsig = self.config[k]
             for i in dsig:
                 loc = dsig2feng(i)
                 if not loc[0] in snaps: continue
@@ -96,8 +101,8 @@ class Settings():
             print('eq0:',dsig)
 
         k = 'eq1'   # coax: shortest
-        if k in cfgkeys:
-            dsig = config[k]
+        if k in self.cfgkeys:
+            dsig = self.config[k]
             for i in dsig:
                 loc = dsig2feng(i)
                 if not loc[0] in snaps: continue
@@ -106,8 +111,8 @@ class Settings():
             print('eq1:',dsig)
 
         k = 'eq2'   # coax: next 40m
-        if k in cfgkeys:
-            dsig = config[k]
+        if k in self.cfgkeys:
+            dsig = self.config[k]
             for i in dsig:
                 loc = dsig2feng(i)
                 if not loc[0] in snaps: continue
@@ -116,8 +121,8 @@ class Settings():
             print('eq2:',dsig)
 
         k = 'eq3'   # coax: next 40m
-        if k in cfgkeys:
-            dsig = config[k]
+        if k in self.cfgkeys:
+            dsig = self.config[k]
             for i in dsig:
                 loc = dsig2feng(i)
                 if not loc[0] in snaps: continue
@@ -126,8 +131,8 @@ class Settings():
             print('eq3:',dsig)
 
         k = 'eq4'   # coax: next 40m
-        if k in cfgkeys:
-            dsig = config[k]
+        if k in self.cfgkeys:
+            dsig = self.config[k]
             for i in dsig:
                 loc = dsig2feng(i)
                 ec.send_command(loc[0],'eq','set_coeffs',kwargs={'stream':int(loc[1]),'coeffs':coef[4].tolist()})
@@ -135,8 +140,8 @@ class Settings():
             print('eq4:',dsig)
 
         k = 'eq5'   # coax: longest
-        if k in cfgkeys:
-            dsig = config[k]
+        if k in self.cfgkeys:
+            dsig = self.config[k]
             for i in dsig:
                 loc = dsig2feng(i)
                 if not loc[0] in snaps: continue        
@@ -145,8 +150,8 @@ class Settings():
             print('eq5:',dsig)
 
         k = 'eq6'   # fiber
-        if k in cfgkeys:
-            dsig = config[k]
+        if k in self.cfgkeys:
+            dsig = self.config[k]
             for i in dsig:
                 loc = dsig2feng(i)
                 if not loc[0] in snaps: continue
@@ -164,8 +169,8 @@ class Settings():
         # LOAD F ENGINE DELAY SETTINGS
         #-----------------------------
 
-        if 'delay_dsig' in config.keys():
-            delays_ns = np.array(config['delay_dsig']) # delays in order of digital sig No., nanoseconds
+        if 'delay_dsig' in self.config.keys():
+            delays_ns = np.array(self.config['delay_dsig']) # delays in order of digital sig No., nanoseconds
     
             max_delay_ns = delays_ns.max()
             delays_clocks = np.round(delays_ns*1e-9 * ADC_CLOCK).astype(int)
@@ -196,8 +201,8 @@ class Settings():
 
         print('TURNING OFF SPECIFIED SIGNALS')
         off = []
-        if 'off' in cfgkeys:
-            off = config['off']
+        if 'off' in self.cfgkeys:
+            off = self.config['off']
             for dsig in off:
                 # Set F engine input to zero
                 feng = dsig2feng(dsig)
@@ -220,8 +225,8 @@ class Settings():
         # NOW LOAD ARX SETTINGS
         #----------------------
 
-        adrs = config['adrs']
-        settings = config['settings']
+        adrs = self.config['adrs']
+        settings = self.config['settings']
         print('LOADING ARX SETTINGS')
         print('addresses: ',adrs)
 
@@ -242,12 +247,11 @@ class Settings():
 
         with open(path+'arxAndF-settings.log','a') as f:
             t = time.time()
-            print(time.asctime(time.gmtime(t)), t, getpass.getuser(), sys.argv[1], config['time'], sep='\t',file=f)
+            print(time.asctime(time.gmtime(t)), t, getpass.getuser(), os.path.basename(self.filename), self.config['time'], sep='\t',file=f)
 
 
-
-def update(filename="data/20230721-settingsAll-night.mat"):
-    settings = Settings(filename)
+def update(filename=LATEST_SETTINGS):
+    settings = Settings(filename=filename)
     settings.load_feng()
     settings.load_arx()
     settings.update_log()
