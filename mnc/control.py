@@ -262,7 +262,7 @@ class Controller():
 
         logger.info(f'pipelines up? {self.pcontroller.pipelines_are_up()}')
         if not self.pcontroller.pipelines_are_up():
-            raise RuntimeError("X engine is not up. Consider restarting xengine with full=True.")
+            logger.warning(f"Not all X-engine are up. Proceeding with {self.xhosts_up}.")
 
         if calibratebeams:
             cal_directory = self.conf['xengines']['cal_directory']
@@ -296,7 +296,7 @@ class Controller():
         if 'drvs' in recorders or 'drvf' in recorders:
             logger.warn('fast and slow vis are already configured by default. '
                         'If you changed data destination or antenna selection,'
-                        'you need to restart the X engine with full=True.')
+                        'you need to restart the X-engine with full=True.')
 
     def control_bf(self, num=1, coord=None, coordtype='celestial', targetname=None,
                    track=True, weight: Union[str, Callable[[float], float]]='core',
@@ -327,7 +327,7 @@ class Controller():
             el = 90
 
         if num not in self.bfc:
-            msg = f"Xengine not configured for beam {num}"
+            msg = f"X-engine not configured for beam {num}"
             logger.error(msg)
             raise KeyError(msg)
 
@@ -368,7 +368,7 @@ class Controller():
             logging.info(f'Beam {num}: Not tracking')
 
     def status_xengine(self):
-        """ print x engine status
+        """ Print X-engine status
         """
         AGE_THRESHOLD_S = 10
         fmt = '{:<16}{:<8}{:<14}{:<14}'
@@ -377,7 +377,7 @@ class Controller():
             capture_status = pipeline.capture.get_bifrost_status()
             corr_status = pipeline.corr.get_bifrost_status()
             if capture_status is None:
-                raise RuntimeError("Failed to get X engine capture block status.")
+                raise RuntimeError("Failed to get X-engine capture block status.")
             alive = (time.time() - corr_status['time'] < AGE_THRESHOLD_S)
             print(fmt.format(f'{pipeline.host}:{pipeline.pipeline_id}',
                              str(bool(alive)),
@@ -390,7 +390,7 @@ class Controller():
             logger.error(msg)
             raise RuntimeError(msg)
 
-        logger.info('Starting Xengine and configuring for visibilities.')
+        logger.info('Starting X-engine and configuring for visibilities.')
         self.pcontroller.start_pipelines(timeout=timeout)
         try:
             self.pcontroller.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_slow_port)  # iterates over all slow corr outputs
