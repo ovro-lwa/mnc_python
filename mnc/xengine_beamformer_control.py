@@ -248,6 +248,7 @@ class BeamPointingControl(object):
         # Load in the calibration data and normalize it
         tab = tables.table(caltable, ack=False)
         caldata = tab.getcol('CPARAM')[...]
+        caldata /= numpy.abs(caldata)
         
         # Load in the flagging data for the calibration
         flgdata = tab.getcol('FLAG')[...]
