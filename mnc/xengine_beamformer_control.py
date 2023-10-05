@@ -156,7 +156,7 @@ class BeamPointingControl(object):
         self._gain = 1.0
         
         # Initially set uniform antenna weighting for a natural beam shape
-        self.set_beam_weighting(lambda x: 1.0)
+        self.set_beam_weighting(fnc=lambda x: 1.0)
         
     def __repr__(self):
         n = self.__class__.__module__+'.'+self.__class__.__name__

@@ -299,13 +299,15 @@ class Controller():
                         'you need to restart the X-engine with full=True.')
 
     def control_bf(self, num=1, coord=None, coordtype='celestial', targetname=None,
-                   track=True, weight: Union[str, Callable[[float], float]]='core',
+                   track=True, uvweight: Union[str, Callable[[float], float]]='core',
+                   flag_ants: List[str]=[],
                    beam_gain=None, duration=0):
         """ Point and track beamformers.
         num refers to the beamformer number (1 through 8).
         If track=True, target is treated as celestial coords or by target name
         If track=False, target is treated as (az, el)
-        weight can be: 'core', 'natural', a single antenna name, or a function (see xengine_beamformer_control.set_beam_weights)
+        uvweight can be: 'core', 'natural' or a function (see xengine_beamformer_control.set_beam_weights)
+        flag_ants is a list of antennas (antnames, not corrnums) to exclude from beamformer.
         beam_gain optionally specifies the amplitude scaling for the beam.
         duration is time to track in seconds (0 means 12 hrs).
         target can be:
@@ -331,15 +333,16 @@ class Controller():
             logger.error(msg)
             raise KeyError(msg)
 
-        if (callable(weight)):
-            assert weight.__code__.co_argcount == 1, "weight function must only take one argument"
-            self.bfc[num].set_beam_weighting(weight)
-        elif (weight == 'core'):
-            self.bfc[num].set_beam_weighting(_core_weight_func)
-        elif (weight == 'natural'):
-            pass
-        elif weight.startswith('LWA-'):
-            self.bfc[num].set_beam_weighting(flag_ants=_single_ant_flags_list(weight))
+        if len(flag_ants):
+            flag_ants = [mapping.antname_to_correlator(antname) for antname in flag_ants]
+        
+        if (callable(uvweight)):
+            assert uvweight.__code__.co_argcount == 1, "weight function must only take one argument"
+            self.bfc[num].set_beam_weighting(fnc=weight, flag_ants=flag_ants)
+        elif (uvweight == 'core'):
+            self.bfc[num].set_beam_weighting(fnc=_core_weight_func, flag_ants=flag_ants)
+        elif (uvweight == 'natural'):
+            self.bfc[num].set_beam_weighting(flag_ants=flag_ants)
         else:
             raise ValueError(f'Invalid value for weight {weight}')
 
