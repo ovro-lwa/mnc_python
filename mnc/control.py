@@ -27,7 +27,7 @@ from mnc import mcs, xengine_beamformer_control
 
 
 CONFIG_FILE = '/home/pipeline/proj/lwa-shell/mnc_python/config/lwa_config_calim.yaml'
-FPG_FILE = '/home/ubuntu/proj/lwa-shell/caltech-lwa/snap2_f_200msps_64i_4096c/outputs/snap2_f_200msps_64i_4096c.fpg'
+FPG_FILE = '/home/pipeline/proj/lwa-shell/caltech-lwa/snap2_f_200msps_64i_4096c/outputs/snap2_f_200msps_64i_4096c.fpg'
 
 CORE_RADIUS_M = 200.0
 
