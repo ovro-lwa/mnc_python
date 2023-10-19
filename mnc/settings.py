@@ -53,7 +53,18 @@ class Settings():
         """ Read configuration data file """
 
         self.filename = filename
-        if filename is not None:
+        self.read_settings(filename=filename)
+
+    def read_settings(self, filename=None, filenum=None):
+        """ Reads a settings file defined by full path or a time-sorted index (use list_settings to print them in order)
+        if filename is defined, it will be used.
+        """
+
+        if filenum is not None and filename is None:
+            filename = sorted([(fn, os.path.basename(fn).split('-')[0]) for fn in glob.glob(DATAPATH + '/*mat')], key=lambda x: x[1])[filenum][0]
+            self.filename = filename
+
+        if self.filename is not None:
             self.config = mat.loadmat(self.filename, squeeze_me=True)
             print('Read data file', self.filename)
             print('Data file internal time: ',time.asctime(time.gmtime(self.config['time'])))
@@ -61,6 +72,24 @@ class Settings():
         else:
 #            self.config = <read from etcd>
             pass
+
+    def list_settings(self):
+        """ Show time ordered list of settings files.
+        
+        """
+
+        enl = enumerate(sorted([(fn, os.path.basename(fn).split('-')[0]) for fn in glob.glob(DATAPATH + '/*mat')], key=lambda x: x[1]))
+        for j,k in enl:
+            print(f'{j}: {k[0]}')
+
+    def get_last_settings(self, path='/home/pipeline/proj/lwa-shell/mnc_python/data/'):
+        """ Look at standard log file and read last entry.
+        """
+
+        # TODO: use etcd for this
+
+        with open(path+'arxAndF-settings.log','r') as f:
+            return os.path.join(DATAPATH, f.readlines()[-1].split()[-2])
 
     def load_feng(self):
         """ Load settings for f-engine to the SNAP2 boards.

@@ -156,7 +156,7 @@ class BeamPointingControl(object):
         self._gain = 1.0
         
         # Initially set uniform antenna weighting for a natural beam shape
-        self.set_beam_weighting(lambda x: 1.0)
+        self.set_beam_weighting(fnc=lambda x: 1.0)
         
     def __repr__(self):
         n = self.__class__.__module__+'.'+self.__class__.__name__
@@ -248,6 +248,7 @@ class BeamPointingControl(object):
         # Load in the calibration data and normalize it
         tab = tables.table(caltable, ack=False)
         caldata = tab.getcol('CPARAM')[...]
+        caldata /= numpy.abs(caldata)
         
         # Load in the flagging data for the calibration
         flgdata = tab.getcol('FLAG')[...]
