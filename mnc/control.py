@@ -300,14 +300,15 @@ class Controller():
 
     def control_bf(self, num=1, coord=None, coordtype='celestial', targetname=None,
                    track=True, uvweight: Union[str, Callable[[float], float]]='core',
-                   flag_ants: List[str]=[],
+                   flag_ants: Union[str, List[str]]='gaincal',
                    beam_gain=None, duration=0):
         """ Point and track beamformers.
         num refers to the beamformer number (1 through 8).
         If track=True, target is treated as celestial coords or by target name
         If track=False, target is treated as (az, el)
         uvweight can be: 'core', 'natural' or a function (see xengine_beamformer_control.set_beam_weights)
-        flag_ants is a list of antennas (antnames, not corrnums) to exclude from beamformer. Pol info will be stripped to flag whole antenna.
+        flag_ants can be name of badant set (e.g., selfcorr or gaincal or list of antnames (not corrnums).
+        Note: pol info (A/B) will be stripped to flag whole antenna.
         beam_gain optionally specifies the amplitude scaling for the beam.
         duration is time to track in seconds (0 means 12 hrs).
         target can be:
@@ -333,9 +334,14 @@ class Controller():
             logger.error(msg)
             raise KeyError(msg)
 
-        if len(flag_ants):
-            flag_ants = [mapping.antname_to_correlator(antname.rstrip('A').rstrip('B')) for antname in flag_ants]
-        
+        # we convert antnames into corr_nums and ignore pol info
+        if isinstance(flag_ants, list):
+            flag_ants = list({mapping.antname_to_correlator(antname.rstrip('A').rstrip('B')) for antname in flag_ants})
+        elif isinstance(flag_ants, str):
+            flag_ants = list({mapping.antname_to_correlator(antname.rstrip('A').rstrip('B')) for antname in anthealth.get_badants(flag_ants)})
+        else:
+            raise RuntimeError
+
         if (callable(uvweight)):
             assert uvweight.__code__.co_argcount == 1, "weight function must only take one argument"
             self.bfc[num].set_beam_weighting(fnc=weight, flag_ants=flag_ants)
