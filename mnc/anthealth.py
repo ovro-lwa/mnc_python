@@ -7,7 +7,7 @@ import numpy as np
 logger = common.get_logger(__name__)
 ls = dsa_store.DsaStore()
 
-METHODS = ['selfcorr', 'union_and', 'union_or']
+METHODS = ['selfcorr', 'caltable', 'union_and', 'union_or']
 
 
 def set_badants(method, badants, naming='ant'):
@@ -94,6 +94,19 @@ def get_badants(method, naming='ant'):
 
     if -1 in badants:
         logger.warning("Correlator number could not be found for some antennas. Something's fishy...")
+
+    return badants
+
+
+def caltable_flags(caltable):
+    """ Parse a CASA caltable and return list of antennas that are fully flagged
+    """
+
+    tab = tables.table(caltable, ack=False)
+    flgdata = tab.getcol('FLAG')[...]  # True means flagged
+    allflg = flgdata.all(axis=1)  # bool per [corrnum, pol]
+    badants = sorted([f'{mapping.correlator_to_antname(corrnum).lstrip("LWA-")}{["A", "B"][pol]}'
+                      for (corrnum, pol) in zip(*np.where(allflg))])
 
     return badants
 
