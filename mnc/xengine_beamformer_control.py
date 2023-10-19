@@ -305,17 +305,20 @@ class BeamPointingControl(object):
         loop.run_until_complete(asyncio.gather(*to_execute, loop=loop))
         loop.close()
     
-    def set_beam_gain(self, gain):
+    def set_beam_gain(self, gain, flag_ants: List[int]=[]):
         """
         Set the "gain" for beam 1 - this is a multiplicative scalar used during
         beamforming.
-        
+        flag_ants is a list of antenna (correlator) numbers to flag.
+
         .. note:: A change to the gain can only activated by an update to the
                   pointing direction.
         """
         
         assert(gain >= 0)
-        self._gain = float(gain)
+        # normalize gain by n_ant/n_ant_max
+        gain_antcount = (len(self.station.antennas)-len(flag_ants))/len(self.station.antennas)
+        self._gain = float(gain)*gain_antcount
         
     def set_beam_weighting(self, fnc=lambda x: 1.0,
                            flag_ants: List[int]=[]):
@@ -324,12 +327,12 @@ class BeamPointingControl(object):
         function should accept a single floating point input of an antenna's
         distance from the array center (in meters) and return a weight between
         0 and 1, inclusive.
-        flagged_ants is a list of antenna (correlator) numbers to flag.
+        flag_ants is a list of antenna (correlator) numbers to flag.
         """
         
         fnc2 = lambda x: numpy.clip(fnc(numpy.sqrt(x[0]**2 + x[1]**2)), 0, 1)
         self._weighting = numpy.array([0. if corr_num in flag_ants else fnc2(ant.enz) for corr_num, ant in enumerate(self.station.antennas)])
-        self._weighting = numpy.repeat(self._weighting, 2)
+        self._weighting = numpy.repeat(self._weighting, 2)   # TODO: evaluate different weigthing per pol
         
     def set_beam_delays(self, delays, pol=0, load_time=None):
         """

@@ -307,7 +307,7 @@ class Controller():
         If track=True, target is treated as celestial coords or by target name
         If track=False, target is treated as (az, el)
         uvweight can be: 'core', 'natural' or a function (see xengine_beamformer_control.set_beam_weights)
-        flag_ants is a list of antennas (antnames, not corrnums) to exclude from beamformer.
+        flag_ants is a list of antennas (antnames, not corrnums) to exclude from beamformer. Pol info will be stripped to flag whole antenna.
         beam_gain optionally specifies the amplitude scaling for the beam.
         duration is time to track in seconds (0 means 12 hrs).
         target can be:
@@ -334,7 +334,7 @@ class Controller():
             raise KeyError(msg)
 
         if len(flag_ants):
-            flag_ants = [mapping.antname_to_correlator(antname) for antname in flag_ants]
+            flag_ants = [mapping.antname_to_correlator(antname.rstrip('A').rstrip('B')) for antname in flag_ants]
         
         if (callable(uvweight)):
             assert uvweight.__code__.co_argcount == 1, "weight function must only take one argument"
@@ -347,7 +347,7 @@ class Controller():
             raise ValueError(f'Invalid value for weight {weight}')
 
         if beam_gain:
-            self.bfc[num].set_beam_gain(beam_gain)
+            self.bfc[num].set_beam_gain(beam_gain, flag_ants=flag_ants)  # TODO: ensure flag_ants matches that used in weighting (single call?)
         if targetname is not None:
             self.bfc[num].set_beam_target(targetname)
         elif ra is not None:
