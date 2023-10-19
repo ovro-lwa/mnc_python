@@ -3,6 +3,7 @@ from lwa_antpos import mapping
 from mnc import common
 from astropy.time import Time
 import numpy as np
+from casacore import tables
 
 logger = common.get_logger(__name__)
 ls = dsa_store.DsaStore()
