@@ -23,7 +23,7 @@ def set_badants(method, badants, naming='ant'):
     assert 'x' not in badants[0].lower() and 'y' not in badants[0].lower(), "define polarization with 'A' or 'B'"
 
     if method not in METHODS:
-        logger.warning(f"method {method} is new. Add it to the fully supported list once validated: {METHODS}.")
+        logger.warning(f"Method {method} not fully supported. Select from: {METHODS}.")
     else:
         if 'union' in method.lower():
             logger.error("Cannot set antenna status with 'union'.")
@@ -65,7 +65,7 @@ def get_badants(method, naming='ant'):
     assert naming in ['ant', 'corr'], "naming must be 'ant' or 'corr'"
 
     if method not in METHODS:
-        logger.warning(f"method {method} is experimental. Fully suppoted methods: {METHODS}.")
+        logger.warning(f"Method {method} not fully supported. Select from: {METHODS}.")
 
     if 'union' not in method:
         dd = ls.get_dict(f'/mon/anthealth/{method}')
