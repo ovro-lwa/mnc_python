@@ -10,7 +10,7 @@ from lwautils import lwa_arx   # arx
 from lwa_antpos import mapping
 from astropy.time import Time, TimeDelta
 import time
-from mnc import settings, common
+from mnc import settings, common, anthealth
 
 logger = common.get_logger(__name__)
 
@@ -612,7 +612,8 @@ class Controller():
             elif response['status'] == 'success':
                 logger.info(f"recording on {recorder} stopped")
             else:
-                logger.warn(f"stopping recording on {recorder} failed: {response['response']}")
+                badrec = [k for k,v in response['response'].items() if v['status'] != 'success']
+                logger.warn(f"stopping recording on {recorder} failed: {badrec}")
 
 def _core_weight_func(r: float) -> float:
     return 1.0 if r < CORE_RADIUS_M else 0.0
