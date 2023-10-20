@@ -336,9 +336,9 @@ class Controller():
 
         # we convert antnames into corr_nums and ignore pol info
         if isinstance(flag_ants, list):
-            flag_ants = list({mapping.antname_to_correlator(antname.rstrip('A').rstrip('B')) for antname in flag_ants})
+            flag_ants = list({f"LWA-{mapping.antname_to_correlator(antname.rstrip('A').rstrip('B')):03" for antname in flag_ants})
         elif isinstance(flag_ants, str):
-            flag_ants = list({mapping.antname_to_correlator(antname.rstrip('A').rstrip('B')) for antname in anthealth.get_badants(flag_ants)})
+            flag_ants = list({f"LWA-{mapping.antname_to_correlator(antname.rstrip('A').rstrip('B')):03" for antname in anthealth.get_badants(flag_ants)})
         else:
             raise RuntimeError
 
@@ -612,8 +612,8 @@ class Controller():
             elif response['status'] == 'success':
                 logger.info(f"recording on {recorder} stopped")
             else:
-                badrec = [k for k,v in response['response'].items() if v['status'] != 'success']
-                logger.warn(f"stopping recording on {recorder} failed: {badrec}")
+#                badrec = [k for k,v in response['response'].items() if v['status'] != 'success']
+                logger.warn(f"stopping recording on {recorder} failed: {response}")
 
 def _core_weight_func(r: float) -> float:
     return 1.0 if r < CORE_RADIUS_M else 0.0
