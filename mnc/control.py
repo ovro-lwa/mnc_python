@@ -167,16 +167,16 @@ class Controller():
 
         if initialize or program:
             if (not all(is_programmed.values()) or force) and program:
-                resp = ec.send_command(0, 'feng', 'program', timeout=60*11, n_response_expected=11, kwargs={'fpgfile': FPG_FILE})
+                resp = ec.send_command(0, 'feng', 'program', timeout=90*11, n_response_expected=11, kwargs={'fpgfile': FPG_FILE})
                 if len(resp) < 11:
                     raise RuntimeError('program failed. Check fengine etcd service logs.')
                 for _ in range(3):
-                    logger('Waiting 30s before checking if all snaps are programmed.')
+                    logger.info('Waiting 30s before checking if all snaps are programmed.')
                     time.sleep(30)
                     is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
                     if len(is_programmed) == 11 and all(is_programmed.values()):
                         break
-                resp = ec.send_command(0, 'feng', 'initialize', kwargs={'read_only':False}, timeout=60*11, n_response_expected=11)
+                resp = ec.send_command(0, 'feng', 'initialize', kwargs={'read_only':False}, timeout=90*11, n_response_expected=11)
                 if len(resp) < 11:
                     raise RuntimeError(f"F-engine failure. Responses are {resp}")
 
@@ -188,10 +188,10 @@ class Controller():
                 snap2num = int(snap2name.lstrip('snap'))
                 resp = ec.send_command(snap2num, 'feng', 'cold_start_from_config',
                                         kwargs={'config_file': self.config_file, 'program': False, 'initialize': True},
-                                        timeout=30)
+                                        timeout=90)
 
                 if resp is not None:
-                    raise RuntimeError('cold_start_from_config failed for board {snap2name}. Check fengine etcd service logs.')
+                    raise RuntimeError(f'cold_start_from_config failed for board {snap2name}. Check fengine etcd service logs.')
         else:
             if not all(is_programmed.values()):
                 logger.warn("Not all snaps are ready. \n Programmed: {is_programmed}.")
