@@ -2,6 +2,7 @@
 # Low-level F-engine control
 # by Larry D'Addario with small modifications by Casey Law
 
+
 # 20220310 - add adcPowerSave().
 # 20221006 - add get_spectra().
 
@@ -20,6 +21,7 @@ sigs9=[*range(0,52),54,55]
 sigs10=[*range(0,52),54,55]
 sigs11=[*range(0,52),54,55]
 sigs=[sigs5,sigs6,sigs7,sigs8,sigs9,sigs10,sigs11]
+
 
 def myfengines():
     """ Get list of f-eng control instances"""
@@ -48,10 +50,10 @@ def myfengines():
                 if not f[i].adc.initialize():
                     print('ADC delay calibration failed.')
             f[i].sync.arm_sync()
-            f[i].sync.sw_sync()
+#            f[i].sync.sw_sync()
     return f
 
-    
+
 def save_spectra(f,filename):
     # Get spectra for all 64 signals and write to a file.
 
@@ -97,7 +99,7 @@ def adc_power(f,sigs):
     var = [max(var[i],0) for i in range(len(var))]      #none < 0
     std = np.sqrt(var)                                  #standard deviation
     pd = [var[i]/512/512/100 for i in range(len(var))]  #power in watts
-    return((std,pd))
+    return (std,pd)
 
 def adcPowerSave(f,snaps,fileprefix=''):
     # f is a list of F-engine;
@@ -146,13 +148,14 @@ def adc_power_dsig(dsig,f,pr=True):
     # pr:  suppress printing if False.
     loc = dsig2feng(dsig)
     p = adc_power(f[loc[0]-1],[loc[1]])
-    rms = p[0]
-    power = p[1]
+    rms = p[0][0]
+    power = p[1][0]
     if pr:  print(dsig,loc,'rms count=',p[0][0],'P/dBm=',10*np.log10(p[1][0])+30)
     return [dsig, loc[0], loc[1], rms, power]
 
 def get_spectrum_dsig(dsig,f):
     loc = dsig2feng(dsig)
-    s = get_spectrum(f[loc[0]-1],loc[1])
+    snapindex = loc[0]-1
+    s = [get_spectrum(f[snapindex],loc[1]), f[snapindex].corr.get_new_corr(loc[1],loc[1])]
     return s
     
