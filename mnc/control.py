@@ -55,7 +55,7 @@ class Controller():
             # clean input
             disallowed = [recorder for recorder in recorders if recorder not in allowed]
             if len(disallowed):
-                print(f'Removing unexpected recorder names: {disallowed}')
+                logger.info(f'Removing unexpected recorder names: {disallowed}')
                 recorders = [recorder for recorder in recorders if recorder in allowed]
             self.conf['dr']['recorders'] = recorders
 
@@ -177,7 +177,7 @@ class Controller():
                     logger.info('All snaps already programmed.')
 
                 for snap2name in snap2names:
-                    print(f"Initializing board {snap2name}")
+                    logger.info(f"Initializing board {snap2name}")
                     snap2num = int(snap2name.lstrip('snap'))
                     resp = ec.send_command(snap2num, 'feng', 'cold_start_from_config',
                                            kwargs={'config_file': self.config_file, 'program': False, 'initialize': True},
@@ -381,14 +381,14 @@ class Controller():
         """
         AGE_THRESHOLD_S = 10
         fmt = '{:<16}{:<8}{:<14}{:<14}'
-        print(fmt.format("Pipeline id:", "alive", "capture_gbps", "corr_gbps"))
+        logger.info(fmt.format("Pipeline id:", "alive", "capture_gbps", "corr_gbps"))
         for pipeline in self.pipelines:
             capture_status = pipeline.capture.get_bifrost_status()
             corr_status = pipeline.corr.get_bifrost_status()
             if capture_status is None:
                 raise RuntimeError("Failed to get X-engine capture block status.")
             alive = (time.time() - corr_status['time'] < AGE_THRESHOLD_S)
-            print(fmt.format(f'{pipeline.host}:{pipeline.pipeline_id}',
+            logger.info(fmt.format(f'{pipeline.host}:{pipeline.pipeline_id}',
                              str(bool(alive)),
                              f"{capture_status['gbps']:.1f}",
                              f"{corr_status['gbps']:.1f}"))
@@ -533,7 +533,7 @@ class Controller():
                     stop = start + TimeDelta(duration/1e3/24/3600, format="jd")
                     self.stop_dr(recorders=recorder, t0=stop)
             else:
-                print(f"recorder name {recorder} not recognized.")
+                logger.info(f"recorder name {recorder} not recognized.")
                 accepted = False
 
             if not accepted:

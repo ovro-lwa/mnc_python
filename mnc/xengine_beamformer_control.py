@@ -256,8 +256,7 @@ class BeamPointingControl(object):
         calfreq = calfreq.ravel()
         tab.close()
         
-        if verbose:
-            print(f"Loaded {caldata.shape[0]} by {caldata.shape[1]} by {caldata.shape[2]} complex gains covering {calfreq[0]/1e6:.3f} to {calfreq[-1]/1e6:.3f} MHz")
+        logger.debug(f"Loaded {caldata.shape[0]} by {caldata.shape[1]} by {caldata.shape[2]} complex gains covering {calfreq[0]/1e6:.3f} to {calfreq[-1]/1e6:.3f} MHz")
             
         # Validate the calibration data structure
         assert(caldata.shape[0] == NSTAND)
@@ -278,8 +277,7 @@ class BeamPointingControl(object):
                 j = self._freq_range_to_pipeline(subband_freq[0], subband_freq[-1])
                 subband_pipelines.append(self.pipelines[j])
                 subband_pipeline_index.append(j)
-                if verbose:
-                    print(f"Found pipeline {j} covering {self.freqs[j][0]/1e6:.3f} to {self.freqs[j][-1]/1e6:.3f} MHz")
+                logger.debug(f"Found pipeline {j} covering {self.freqs[j][0]/1e6:.3f} to {self.freqs[j][-1]/1e6:.3f} MHz")
             except ValueError:
                 pass
                 
@@ -416,20 +414,17 @@ class BeamPointingControl(object):
                 ra = Angle(target_or_ra, unit='hourangle')
                 dec = Angle(dec, unit='deg')
                 sc = SkyCoord(ra, dec, frame='fk5')
-                if verbose:
-                    print(f"Resolved '{target_or_ra}, {dec}' to RA {sc.ra}, Dec. {sc.dec}")
+                logger.debug(f"Resolved '{target_or_ra}, {dec}' to RA {sc.ra}, Dec. {sc.dec}")
                     
             elif target_or_ra.lower() in solar_system_ephemeris.bodies:
                 if target_or_ra.lower().startswith('earth'):
                     raise ValueError(f"Invalid target: '{target_or_ra}'")
                     
                 sc = get_body(target_or_ra.lower(), Time.now(), location=obs)
-                if verbose:
-                    print(f"Resolved '{target_or_ra}' to {target_or_ra.lower()}")
+                logger.debug(f"Resolved '{target_or_ra}' to {target_or_ra.lower()}")
             else:
                 sc = SkyCoord.from_name(target_or_ra)
-                if verbose:
-                    print(f"Resolved '{target_or_ra}' to RA {sc.ra}, Dec. {sc.dec}")
+                logger.debug(f"Resolved '{target_or_ra}' to RA {sc.ra}, Dec. {sc.dec}")
                     
             ## Figure out where it is right now (or at least at the load time)
             if load_time is not None:
@@ -440,8 +435,7 @@ class BeamPointingControl(object):
             aa = sc.transform_to(AltAz(obstime=compute_time, location=obs))
             az = aa.az.deg
             alt = aa.alt.deg
-            if verbose:
-                print(f"Currently at azimuth {aa.az}, altitude {aa.alt}")
+            logger.debug(f"Currently at azimuth {aa.az}, altitude {aa.alt}")
                 
         # Point the beam
         self.set_beam_pointing(az, alt, degrees=True, load_time=load_time)
@@ -488,19 +482,16 @@ class BeamTracker(object):
                 raise ValueError(f"Invalid target: '{target_or_ra}'")
                 
             sc = get_body(target_or_ra.lower(), Time.now(), location=obs)
-            if verbose:
-                print(f"Resolved '{target_or_ra}' to {target_or_ra.lower()}")
+            logger.debug(f"Resolved '{target_or_ra}' to {target_or_ra.lower()}")
         else:
             if dec is not None:
                 ra = Angle(target_or_ra, unit='hourangle')
                 dec = Angle(dec, unit='deg')
                 sc = SkyCoord(ra, dec, frame='fk5')
-                if verbose:
-                    print(f"Resolved '{target_or_ra}, {dec}' to RA {sc.ra}, Dec. {sc.dec}")
+                logger.debug(f"Resolved '{target_or_ra}, {dec}' to RA {sc.ra}, Dec. {sc.dec}")
             else:
                 sc = SkyCoord.from_name(target_or_ra)
-                if verbose:
-                    print(f"Resolved '{target_or_ra}' to RA {sc.ra}, Dec. {sc.dec}")
+                logger.debug(f"Resolved '{target_or_ra}' to RA {sc.ra}, Dec. {sc.dec}")
                     
         # Figure out the duration of the tracking
         if duration <= 0:
@@ -527,8 +518,7 @@ class BeamTracker(object):
                 aa = sc.transform_to(AltAz(obstime=Time.now()+puto, location=obs))
                 az = aa.az.deg
                 alt = aa.alt.deg
-                if verbose:
-                    print(f"At {time.time():.1f}, moving to azimuth {aa.az}, altitude {aa.alt}")
+                logger.debug(f"At {time.time():.1f}, moving to azimuth {aa.az}, altitude {aa.alt}")
                     
                 ## Point
                 self.control_instance.set_beam_pointing(az, alt, degrees=True, load_time=t_mark+2)

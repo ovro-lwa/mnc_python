@@ -38,7 +38,7 @@ isodd = lambda a: bool(a % 2)
 try:
     from lwa_f import snap2_feng_etcd_client
     ec = snap2_feng_etcd_client.Snap2FengineEtcdControl(common.ETCD_HOST)
-    print('Connected to ETCD host %s' % common.ETCD_HOST)
+    logger.info('Connected to ETCD host %s' % common.ETCD_HOST)
 except ImportError:
     logger.warning('No f-eng library found. Skipping.')
 
@@ -66,8 +66,8 @@ class Settings():
 
         if self.filename is not None:
             self.config = mat.loadmat(self.filename, squeeze_me=True)
-            print('Read data file', self.filename)
-            print('Data file internal time: ',time.asctime(time.gmtime(self.config['time'])))
+            logger.info('Read data file', self.filename)
+            logger.info('Data file internal time: ',time.asctime(time.gmtime(self.config['time'])))
             self.cfgkeys = self.config.keys()
         else:
 #            self.config = <read from etcd>
@@ -80,7 +80,7 @@ class Settings():
 
         enl = enumerate(sorted([(fn, os.path.basename(fn).split('-')[0]) for fn in glob.glob(DATAPATH + '/*mat')], key=lambda x: x[1]))
         for j,k in enl:
-            print(f'{j}: {k[0]}')
+            logger.info(f'{j}: {k[0]}')
 
     def get_last_settings(self, path='/home/pipeline/proj/lwa-shell/mnc_python/data/'):
         """ Look at standard log file and read last entry.
@@ -95,7 +95,7 @@ class Settings():
         """ Load settings for f-engine to the SNAP2 boards.
         """
         
-        print('Loading settings to SNAP2 boards:', snaps)
+        logger.info('Loading settings to SNAP2 boards:', snaps)
 
         #=================================
         # SET F ENGINE FFT SHIFT SCHEDULE
@@ -108,7 +108,7 @@ class Settings():
 
         for i in snaps:
             ec.send_command(i,'pfb','set_fft_shift',kwargs={'shift':int(fftshift)})
-        print('All FFT shifts set to','%04X' % fftshift)
+        logger.info('All FFT shifts set to','%04X' % fftshift)
 
 
         #=====================================
@@ -117,6 +117,7 @@ class Settings():
 
         coef = self.config['coef']   # must include this key
         dsigDone = []
+        logger.info('LOADING EQUALIZATION COEFFICIENTS')
         print('LOADING EQUALIZATION COEFFICIENTS')
 
         k = 'eq0'   # coax length = ref+-50m
@@ -210,6 +211,7 @@ class Settings():
 
             delays_to_apply_clocks = relative_delays_clocks + DELAY_OFFSET
 
+            logger.info('LOADING DELAYS')
             print('LOADING DELAYS')
             print('Maximum delay: %f ns' % max_delay_ns)
             print('Maximum delay: %d ADC clocks' % max_delay_clocks)
@@ -228,6 +230,7 @@ class Settings():
         # SET UNUSED F INPUTS TO ZERO
         #----------------------------
 
+        logger.info('TURNING OFF SPECIFIED SIGNALS')
         print('TURNING OFF SPECIFIED SIGNALS')
         off = []
         if 'off' in self.cfgkeys:
@@ -256,6 +259,7 @@ class Settings():
 
         adrs = self.config['adrs']
         settings = self.config['settings']
+        logger.info('LOADING ARX SETTINGS')
         print('LOADING ARX SETTINGS')
         print('addresses: ',adrs)
 
