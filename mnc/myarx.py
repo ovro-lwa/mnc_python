@@ -9,6 +9,7 @@
 # 20230625 - rfPowerOffset(): keep log of results whenever it is run.
 # 20230628 - feeOn(), feeOff():  add option to control a single channel.
 # 20230809 - fix bugs in feeOn() and feeOff() for single-channel control.
+# 20231114 - fix bug in status() when offsets not given.
 
 
 import lwautils.lwa_arx
@@ -70,6 +71,19 @@ def rfPowerOffset(adr):
             print(adr,time.time(),sn,str(offsets).strip('[]'), sep=',',file=f)
     except: pass
     return offsets
+
+def rfPowerOffsetsGet():
+    offsets = []
+    with open(RFPOWEROFFSETLOG,'r') as f:
+        lines = f.readlines()
+    lines = lines[-1:0:-1]
+    for adr in range(1,46):  # all ARX addresses
+        o = [[int(float(lines[i].split(',')[j])) for j in range(19)] for i in range(len(lines))]
+        for i in range(len(o)):
+            if o[i][0] == adr:
+                offsets.append(o[i][3:])
+                break
+    return(offsets)
 
 def rfPowerSave(adr,offsets,fileprefix=''):
     # adr is a list of addresses;
@@ -227,19 +241,24 @@ def status(adr,offsets=[],pr=True,header=False):
     # pr=False to suppress printing
     # returns:
     # [[analogSigNr, arxAdr, arxCh, AT1,AT2,filter,biasOn, current_mA, rfPower_W],...]
+
+    #print(adr)  #debug
     warnings.simplefilter('ignore') # ignore all warnings (esp. divide by 0)
     stat = []
     if pr and header: print('sig','adr','ch','config','I/mA','P/dBm')
     if not isinstance(adr,list):
         adr=[adr]
+        offsets=[offsets]
     #print('myarx.status.adr:',adr)
     for i in range(len(adr)):
         a = adr[i]
-        if len(adr) < 2:            o = offsets
+        #print(a)  #debug
+        if len(adr) == 1: o = offsets
         elif len(offsets)<len(adr): o = rfPowerOffset(a)
-        else:                       o = offsets[i]
+        else:             o = offsets[i]
+        if len(o)<16:     o = rfPowerOffset(a)
         #print('myarx.status.o:',o)
-        p = rfPower(a,o)
+        p = rfPower(a,offset=o)
         I = 0.4*np.array(raw2int(a,'CURA'))
         r = raw2int(a,'GETA')
         for i in range(len(r)):
