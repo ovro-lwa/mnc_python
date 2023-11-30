@@ -1,0 +1,28 @@
+[Unit]
+Description=OVRO-LWA dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Run as the specified user
+User=pipeline
+
+# Allow unlimited locked memory
+LimitMEMLOCK=infinity
+
+# Logging
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=dashboard
+
+# Setup the environment
+Environment=PYTHONUNBUFFERED=1
+
+ExecStart=/opt/devel/pipeline/envs/dashboard/bin/panel serve /home/pipeline/proj/lwa-shell/mnc_python/notebooks/LWA_dashboard.ipynb --port 5005 --session-token-expiration 300 --unused-session-lifetime 10000 --keep-alive 1000 --check-unused-sessions 5000
+
+Restart=always
+RestartSec=10
+StartLimitBurst=3
+
+[Install]
+WantedBy=multi-user.target
