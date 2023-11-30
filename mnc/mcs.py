@@ -396,10 +396,6 @@ class Client(object):
         self.timeout = timeout
         
         self.client = etcd3.client(host=ETCD_HOST, port=ETCD_PORT)
-        self._mon_manifest = ['manifest/monitoring', 'manifest/commands']
-        self._mon_manifest_lock = self.client.lock('mon_manifest_lock', ttl=5)
-        self._cmd_manifest = []
-        self._cmd_manifest_lock = self.client.lock('cmd_manifest_lock', ttl=5)
         self._watchers = {}
         
     def __del__(self):
@@ -412,103 +408,7 @@ class Client(object):
             self.client.close()
         except Exception:
             pass
-        
-    def _update_mon_manifest(self, name, drop=False):
-        """
-        Update the monitoring point manifest as needed.  Returns a Boolean of
-        whether or not an update was made.
-        """
-       
-        with self._mon_manifest_lock:
-            # Is it alread in the local manifest?
-            updated = False
-            value = None
-            if drop:
-                ## Remove from the local manifest
-                try:
-                    del self._mon_manifest[self._mon_manifest.index(name)]
-                except ValueError:
-                    pass
-                    
-                ## Check the published manifest
-                value = self.read_monitor_point('manifest/monitoring')
-                if value is None:
-                    value = MonitorPoint([])
-                try:
-                    del value.value[value.value.index(name)]
-                    updated = True
-                except ValueError:
-                    pass
-                    
-            elif name not in self._mon_manifest:
-                ## Not in the local manifest
-                self._mon_manifest.append(name)
-                
-                ## Check the published manifest
-                value = self.read_monitor_point('manifest/monitoring')
-                if value is None:
-                    value = MonitorPoint([])
-                for entry in self._mon_manifest:
-                    if entry not in value.value:
-                        value.value.append(entry)
-                        updated = True
-                        
-            # If there is an update, push it out
-            if updated and value is not None:
-                value.timestamp = time.time()
-                value = value.as_json()
-                self.client.put('/mon/%s/%s' % (self.id, 'manifest/monitoring'), value)
-                
-        return updated
-        
-    def _update_cmd_manifest(self, name, drop=False):
-        """
-        Update the command manifest as needed.  Returns a Boolean of whether or
-        not an update was made.
-        """
-       
-        with self._cmd_manifest_lock:
-            # Is it alread in the local manifest?
-            updated = False
-            value = None
-            if drop:
-                ## Remove from the local manifest
-                try:
-                    del self._cmd_manifest[self._cmd_manifest.index(name)]
-                except ValueError:
-                    pass
-                    
-                ## Check the published manifest
-                value = self.read_monitor_point('manifest/commands')
-                if value is None:
-                    value = MonitorPoint([])
-                try:
-                    del value.value[value.value.index(name)]
-                    updated = True
-                except ValueError:
-                    pass
-                    
-            elif name not in self._cmd_manifest:
-                ## Not in the local manifest
-                self._cmd_manifest.append(name)
-                
-                ## Check the published manifest
-                value = self.read_monitor_point('manifest/commands')
-                if value is None:
-                    value = MonitorPoint([])
-                for entry in self._cmd_manifest:
-                    if entry not in value.value:
-                        value.value.append(entry)
-                        updated = True
-                        
-            # If there is an update, push it out
-            if updated and value is not None:
-                value.timestamp = time.time()
-                value = value.as_json()
-                self.client.put('/mon/%s/%s' % (self.id, 'manifest/commands'), value)
-                
-        return updated
-        
+            
     def remove_monitor_point(self, name):
         """
         Remove the specified monitoring point.  Returns True if the deletion was
@@ -522,7 +422,6 @@ class Client(object):
             
         try:
             self.client.delete('/mon/%s/%s' % (self.id, name))
-            self._update_mon_manifest(name, drop=True)
             return True
         except Exception as e:
             return False
@@ -550,7 +449,6 @@ class Client(object):
         
         try:
             self.client.put('/mon/%s/%s' % (self.id, name), value)
-            self._update_mon_manifest(name)
             return True
         except Exception:
             return False
@@ -578,18 +476,6 @@ class Client(object):
             warnings.warn("Error reading monitor point '/mon/%s/%s': %s" % (id, name, str(e)), RuntimeWarning)
             return None
             
-    def list_monitor_points(self, id=None):
-        """
-        Return the contents of the monitoring point manifest.  An 'id' of 'None'
-        is interpretted as that monitoring point on the current subsystem.  Returns
-        the list if successful, None otherwise.
-        """
-        
-        res = self.read_monitor_point('manifest/monitoring', id=id)
-        if res is not None:
-            res = res.value
-        return res
-        
     def set_monitor_point_callback(self, name, callback, id=None):
         """
         Watch the specified monitoring point and execute the callback when its
@@ -707,18 +593,7 @@ class Client(object):
         """
         
         return self.canel_monitor_point_callback(name, id)
-        
-    def list_commands(self, subsystem):
-        """
-        Return the contents of the command manifest for the specified subsystem.
-        Returns the list if successful, None otherwise.
-        """
-        
-        res = self.read_monitor_point('manifest/commands', id=subsystem)
-        if res is not None:
-            res = res.value
-        return res
-            
+         
     def set_command_callback(self, command, callback):
         """
         Process a command by executing the callback when it is received.  The
@@ -743,7 +618,6 @@ class Client(object):
             except KeyError:
                 pass
             self._watchers[command] = (watch_id, callback)
-            self._update_cmd_manifest(command)
             return True
         except Exception as e:
             return False
@@ -763,7 +637,6 @@ class Client(object):
         try:
             self.client.cancel_watch(self._watchers[full_name][0])
             del self._watchers[full_name]
-            self._update_cmd_manifest(command, drop=True)
             return True
         except KeyError:
             return False
