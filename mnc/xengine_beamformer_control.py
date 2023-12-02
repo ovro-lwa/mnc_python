@@ -583,7 +583,7 @@ def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4,
         for calfile in calfiles:
             control_instance.set_beam_calibration(calfile, beam)
             try:
-                obsstate.set_caltable(calfile)
+                obsstate.set_caltable(calfile, beam)
             except:
                 logger.warn(f"Failed to set caltable in obsstate for {calfile}")
     else:
