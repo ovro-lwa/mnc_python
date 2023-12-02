@@ -8,6 +8,8 @@ import getpass
 
 from mnc import myarx as a
 from mnc import common
+from observing import obsstate
+
 
 DATAPATH = '/home/pipeline/proj/lwa-shell/mnc_python/data/'
 LATEST_SETTINGS = sorted([(fn, os.path.basename(fn).split('-')[0]) for fn in glob.glob(DATAPATH + '/*mat')], key=lambda x: x[1])[-1][0]
@@ -284,3 +286,7 @@ def update(filename=LATEST_SETTINGS):
     settings.load_feng()
     settings.load_arx()
     settings.update_log()
+    try:
+        obsstate.add_settings(filename)
+    except:
+        logger.warning('Could not add settings to obsstate.')
