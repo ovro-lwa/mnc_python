@@ -4,7 +4,6 @@ import json
 import time
 import numpy
 import ipaddress
-import progressbar
 from threading import RLock
 from textwrap import fill as tw_fill
 from concurrent.futures import ThreadPoolExecutor, wait as thread_pool_wait
@@ -13,6 +12,7 @@ from typing import List
 
 from lwa352_pipeline_control import Lwa352PipelineControl
 from casacore import tables
+from observing import obsstate
 
 import astropy.units as u
 from astropy.time import Time, TimeDelta
@@ -581,7 +581,11 @@ def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4,
         
         # Load the calibration data, if found
         for calfile in calfiles:
-            control_instance.set_beam_calibration(calfile)
+            control_instance.set_beam_calibration(calfile, beam)
+            try:
+                obsstate.add_calibrations(calfile, beam)
+            except Exception as exc:
+                logger.warn(f"Failed to set caltable in obsstate for {calfile}: {exc}")
     else:
         logger.info(f"Calibration already set for beam {beam}. To overload, use force=True")
        
