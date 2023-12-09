@@ -287,6 +287,7 @@ def update(filename=LATEST_SETTINGS):
     settings.load_arx()
     settings.update_log()
     try:
-        obsstate.add_settings(filename)
+        t_now = time.asctime(time.gmtime(time.time()))
+        obsstate.add_settings(filename, t_now)
     except:
         logger.warning('Could not add settings to obsstate.')
