@@ -248,6 +248,7 @@ class BeamPointingControl(object):
         # Load in the calibration data and normalize it
         tab = tables.table(caltable, ack=False)
         caldata = tab.getcol('CPARAM')[...]
+        flgdata = tab.getcol('FLAG')[...]
         tab.close()
         
         # Load in the frequency information for the calibration
@@ -299,6 +300,8 @@ class BeamPointingControl(object):
                 for pol in range(NPOL):
                     cal = 1./caldata[j,i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol].ravel()
                     cal = numpy.where(numpy.isfinite(cal), cal, 0)
+                    flg = flgdata[j,i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol].ravel()
+                    cal *= (1-flg)
                     to_execute.append(push_gains(p, ii, 2*(self.beam-1)+pol, NPOL*j+pol, cal))
         loop.run_until_complete(asyncio.gather(*to_execute, loop=loop))
         loop.close()
