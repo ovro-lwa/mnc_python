@@ -248,9 +248,6 @@ class BeamPointingControl(object):
         # Load in the calibration data and normalize it
         tab = tables.table(caltable, ack=False)
         caldata = tab.getcol('CPARAM')[...]
-        caldata /= numpy.abs(caldata)
-        
-        # Load in the flagging data for the calibration
         flgdata = tab.getcol('FLAG')[...]
         tab.close()
         
@@ -260,8 +257,7 @@ class BeamPointingControl(object):
         calfreq = calfreq.ravel()
         tab.close()
         
-        if verbose:
-            print(f"Loaded {caldata.shape[0]} by {caldata.shape[1]} by {caldata.shape[2]} complex gains covering {calfreq[0]/1e6:.3f} to {calfreq[-1]/1e6:.3f} MHz")
+        logger.debug(f"Loaded {caldata.shape[0]} by {caldata.shape[1]} by {caldata.shape[2]} complex gains covering {calfreq[0]/1e6:.3f} to {calfreq[-1]/1e6:.3f} MHz")
             
         # Validate the calibration data structure
         assert(caldata.shape[0] == NSTAND)
@@ -282,8 +278,7 @@ class BeamPointingControl(object):
                 j = self._freq_range_to_pipeline(subband_freq[0], subband_freq[-1])
                 subband_pipelines.append(self.pipelines[j])
                 subband_pipeline_index.append(j)
-                if verbose:
-                    print(f"Found pipeline {j} covering {self.freqs[j][0]/1e6:.3f} to {self.freqs[j][-1]/1e6:.3f} MHz")
+                logger.debug(f"Found pipeline {j} covering {self.freqs[j][0]/1e6:.3f} to {self.freqs[j][-1]/1e6:.3f} MHz")
             except ValueError:
                 pass
                 
@@ -305,23 +300,26 @@ class BeamPointingControl(object):
                 for pol in range(NPOL):
                     cal = 1./caldata[j,i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol].ravel()
                     cal = numpy.where(numpy.isfinite(cal), cal, 0)
-                    flg = flgdata[j,i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol].ravel()
-                    cal *= (1-flg)
+#                    flg = flgdata[j,i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol].ravel()
+#                    cal *= (1-flg)
                     to_execute.append(push_gains(p, ii, 2*(self.beam-1)+pol, NPOL*j+pol, cal))
         loop.run_until_complete(asyncio.gather(*to_execute, loop=loop))
         loop.close()
     
-    def set_beam_gain(self, gain):
+    def set_beam_gain(self, gain, flag_ants: List[int]=[]):
         """
         Set the "gain" for beam 1 - this is a multiplicative scalar used during
         beamforming.
-        
+        flag_ants is a list of antenna (correlator) numbers to flag.
+
         .. note:: A change to the gain can only activated by an update to the
                   pointing direction.
         """
         
         assert(gain >= 0)
-        self._gain = float(gain)
+        # normalize gain by n_ant/n_ant_max
+        gain_antcount = (len(self.station.antennas)-len(flag_ants))/len(self.station.antennas)
+        self._gain = float(gain)/gain_antcount
         
     def set_beam_weighting(self, fnc=lambda x: 1.0,
                            flag_ants: List[int]=[]):
@@ -330,12 +328,12 @@ class BeamPointingControl(object):
         function should accept a single floating point input of an antenna's
         distance from the array center (in meters) and return a weight between
         0 and 1, inclusive.
-        flagged_ants is a list of antenna (correlator) numbers to flag.
+        flag_ants is a list of antenna (correlator) numbers to flag.
         """
         
         fnc2 = lambda x: numpy.clip(fnc(numpy.sqrt(x[0]**2 + x[1]**2)), 0, 1)
         self._weighting = numpy.array([0. if corr_num in flag_ants else fnc2(ant.enz) for corr_num, ant in enumerate(self.station.antennas)])
-        self._weighting = numpy.repeat(self._weighting, 2)
+        self._weighting = numpy.repeat(self._weighting, 2)   # TODO: evaluate different weigthing per pol
         
     def set_beam_delays(self, delays, pol=0, load_time=None):
         """
@@ -419,20 +417,17 @@ class BeamPointingControl(object):
                 ra = Angle(target_or_ra, unit='hourangle')
                 dec = Angle(dec, unit='deg')
                 sc = SkyCoord(ra, dec, frame='fk5')
-                if verbose:
-                    print(f"Resolved '{target_or_ra}, {dec}' to RA {sc.ra}, Dec. {sc.dec}")
+                logger.debug(f"Resolved '{target_or_ra}, {dec}' to RA {sc.ra}, Dec. {sc.dec}")
                     
             elif target_or_ra.lower() in solar_system_ephemeris.bodies:
                 if target_or_ra.lower().startswith('earth'):
                     raise ValueError(f"Invalid target: '{target_or_ra}'")
                     
                 sc = get_body(target_or_ra.lower(), Time.now(), location=obs)
-                if verbose:
-                    print(f"Resolved '{target_or_ra}' to {target_or_ra.lower()}")
+                logger.debug(f"Resolved '{target_or_ra}' to {target_or_ra.lower()}")
             else:
                 sc = SkyCoord.from_name(target_or_ra)
-                if verbose:
-                    print(f"Resolved '{target_or_ra}' to RA {sc.ra}, Dec. {sc.dec}")
+                logger.debug(f"Resolved '{target_or_ra}' to RA {sc.ra}, Dec. {sc.dec}")
                     
             ## Figure out where it is right now (or at least at the load time)
             if load_time is not None:
@@ -443,8 +438,7 @@ class BeamPointingControl(object):
             aa = sc.transform_to(AltAz(obstime=compute_time, location=obs))
             az = aa.az.deg
             alt = aa.alt.deg
-            if verbose:
-                print(f"Currently at azimuth {aa.az}, altitude {aa.alt}")
+            logger.debug(f"Currently at azimuth {aa.az}, altitude {aa.alt}")
                 
         # Point the beam
         self.set_beam_pointing(az, alt, degrees=True, load_time=load_time)
@@ -491,19 +485,16 @@ class BeamTracker(object):
                 raise ValueError(f"Invalid target: '{target_or_ra}'")
                 
             sc = get_body(target_or_ra.lower(), Time.now(), location=obs)
-            if verbose:
-                print(f"Resolved '{target_or_ra}' to {target_or_ra.lower()}")
+            logger.debug(f"Resolved '{target_or_ra}' to {target_or_ra.lower()}")
         else:
             if dec is not None:
                 ra = Angle(target_or_ra, unit='hourangle')
                 dec = Angle(dec, unit='deg')
                 sc = SkyCoord(ra, dec, frame='fk5')
-                if verbose:
-                    print(f"Resolved '{target_or_ra}, {dec}' to RA {sc.ra}, Dec. {sc.dec}")
+                logger.debug(f"Resolved '{target_or_ra}, {dec}' to RA {sc.ra}, Dec. {sc.dec}")
             else:
                 sc = SkyCoord.from_name(target_or_ra)
-                if verbose:
-                    print(f"Resolved '{target_or_ra}' to RA {sc.ra}, Dec. {sc.dec}")
+                logger.debug(f"Resolved '{target_or_ra}' to RA {sc.ra}, Dec. {sc.dec}")
                     
         # Figure out the duration of the tracking
         if duration <= 0:
@@ -530,8 +521,7 @@ class BeamTracker(object):
                 aa = sc.transform_to(AltAz(obstime=Time.now()+puto, location=obs))
                 az = aa.az.deg
                 alt = aa.alt.deg
-                if verbose:
-                    print(f"At {time.time():.1f}, moving to azimuth {aa.az}, altitude {aa.alt}")
+                logger.debug(f"At {time.time():.1f}, moving to azimuth {aa.az}, altitude {aa.alt}")
                     
                 ## Point
                 self.control_instance.set_beam_pointing(az, alt, degrees=True, load_time=t_mark+2)
