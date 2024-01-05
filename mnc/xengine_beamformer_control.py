@@ -278,7 +278,7 @@ class BeamPointingControl(object):
                 j = self._freq_range_to_pipeline(subband_freq[0], subband_freq[-1])
                 subband_pipelines.append(self.pipelines[j])
                 subband_pipeline_index.append(j)
-                logger.debug(f"Found pipeline {j} covering {self.freqs[j][0]/1e6:.3f} to {self.freqs[j][-1]/1e6:.3f} MHz")
+                logger.info(f"Found pipeline {j} covering {self.freqs[j][0]/1e6:.3f} to {self.freqs[j][-1]/1e6:.3f} MHz")
             except ValueError:
                 pass
                 
