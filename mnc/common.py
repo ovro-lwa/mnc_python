@@ -8,6 +8,7 @@ import subprocess
 from datetime import datetime, timedelta
 import logging
 from logging.handlers import TimedRotatingFileHandler
+from typing import Optional
 
 from astropy.time import Time as AstroTime
 
@@ -317,3 +318,70 @@ def get_logger(name: str) -> logging.Logger:
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             level=logging.INFO)
     return logging.getLogger(name)
+
+from lwa_f.snap2_feng_etcd_client import Snap2FengineEtcdControl
+
+class ExceptionalSnap2FengineEtcdControl(Snap2FengineEtcdControl):
+    """
+    Subclass of Snap2FengineEtcdControl that retries and eventually
+    raises an exception on etcd command error.
+
+    :param etcdhost: Hostname (or IP, in dotted quad notation)
+        of target etcd server.
+    :type etcdhost: string
+
+    :param logger: Python `logging.Logger` instance to which
+        this class's log messages should be emitted. If None,
+        log to stderr
+    :type logger: logging.Logger
+
+    :param noetcd: If True, don't actually use the etcd interface --
+        just communicate with the SNAPs directly.
+    :type noetcd: bool
+
+    :param retries: Number of times to retry an etcd command before
+        raising an exception.
+    :type retries: int
+    """
+
+    # Override
+    def __init__(self, etcdhost="etcdv3service.sas.pvt", logger=None, noetcd=False, retries=0):
+        super().__init__(etcdhost=etcdhost, logger=logger, noetcd=noetcd)
+        self.retries = None if noetcd else retries
+
+    # Override
+    def _send_command_etcd(self, fid, block, cmd, kwargs={}, timeout=10.0, n_response_expected=1):
+        trial = 0
+        n_trials = self.retries + 1 if self._is_retryable_command(block, cmd, kwargs) else 1
+        while trial < n_trials:
+            trial += 1
+            resp = super()._send_command_etcd(fid, block, cmd, kwargs, timeout, n_response_expected)
+            
+            # empty dict means error and None means ok
+            if n_response_expected == 1 and resp != {}:
+                return resp
+            elif n_response_expected > 1 and resp is not None and len(resp) == n_response_expected:
+                return resp
+            else:
+                if trial < n_trials:
+                    self.logger.warning(f"Retrying command {cmd} on fid {fid}.")
+        raise RuntimeError(f"Failed to execute command {cmd} on fid {fid} after {trial} attempts."
+                           "Try searching for the command in lwa-feng-etcd logs.")
+    
+    def _is_retryable_command(self, block:str, cmd: str, kwargs: dict) -> bool:
+        """
+        Exclude commands that Yuping have not figured out how to retry yet.
+        """
+        if block != 'feng':
+            return True
+
+        if cmd == 'program':
+            return False
+        # cold_start_from_config with program=True and
+        # initialize with read_only=False do ADC link training and takes a while
+        elif cmd == 'cold_start_from_config' and kwargs.get('program', False):
+            return False
+        elif cmd == 'initialize' and not kwargs.get('read_only', True):
+            return False
+        else:
+            return True

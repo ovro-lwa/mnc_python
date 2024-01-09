@@ -24,11 +24,7 @@ adrs = range(15,46)  #addresses of ARX boards (rollout phase 3)
 RFPOWEROFFSETLOG = '/home/ldaddario/arxPowerOffsets.log'
 
 def raw(adr,cmd):
-    r = []
-    try:
-        r = arx.raw(adr,cmd)
-    except:
-        pass
+    r = arx.raw(adr,cmd)
     return r
 
 def raw2int(adr,cmd):
