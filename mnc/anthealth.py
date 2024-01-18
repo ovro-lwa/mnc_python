@@ -3,11 +3,12 @@ from lwa_antpos import mapping
 from mnc import common
 from astropy.time import Time
 import numpy as np
+from casacore import tables
 
 logger = common.get_logger(__name__)
 ls = dsa_store.DsaStore()
 
-METHODS = ['selfcorr', 'union_and', 'union_or']
+METHODS = ['selfcorr', 'caltable', 'union_and', 'union_or']
 
 
 def set_badants(method, badants, naming='ant'):
@@ -22,7 +23,7 @@ def set_badants(method, badants, naming='ant'):
     assert 'x' not in badants[0].lower() and 'y' not in badants[0].lower(), "define polarization with 'A' or 'B'"
 
     if method not in METHODS:
-        logger.warning(f"method {method} is new. Add it to the fully supported list once validated: {METHODS}.")
+        logger.warning(f"Method {method} not fully supported. Select from: {METHODS}.")
     else:
         if 'union' in method.lower():
             logger.error("Cannot set antenna status with 'union'.")
@@ -64,7 +65,7 @@ def get_badants(method, naming='ant'):
     assert naming in ['ant', 'corr'], "naming must be 'ant' or 'corr'"
 
     if method not in METHODS:
-        logger.warning(f"method {method} is experimental. Fully suppoted methods: {METHODS}.")
+        logger.warning(f"Method {method} not fully supported. Select from: {METHODS}.")
 
     if 'union' not in method:
         dd = ls.get_dict(f'/mon/anthealth/{method}')
@@ -94,6 +95,19 @@ def get_badants(method, naming='ant'):
 
     if -1 in badants:
         logger.warning("Correlator number could not be found for some antennas. Something's fishy...")
+
+    return badants
+
+
+def caltable_flags(caltable):
+    """ Parse a CASA caltable and return list of antennas that are fully flagged
+    """
+
+    tab = tables.table(caltable, ack=False)
+    flgdata = tab.getcol('FLAG')[...]  # True means flagged
+    allflg = flgdata.all(axis=1)  # bool per [corrnum, pol]
+    badants = sorted([f'{mapping.correlator_to_antname(corrnum).lstrip("LWA-")}{["A", "B"][pol]}'
+                      for (corrnum, pol) in zip(*np.where(allflg))])
 
     return badants
 

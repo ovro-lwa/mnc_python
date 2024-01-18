@@ -10,7 +10,7 @@ from lwautils import lwa_arx   # arx
 from lwa_antpos import mapping
 from astropy.time import Time, TimeDelta
 import time
-from mnc import settings, common
+from mnc import settings, common, anthealth
 
 logger = common.get_logger(__name__)
 
@@ -55,7 +55,7 @@ class Controller():
             # clean input
             disallowed = [recorder for recorder in recorders if recorder not in allowed]
             if len(disallowed):
-                print(f'Removing unexpected recorder names: {disallowed}')
+                logger.info(f'Removing unexpected recorder names: {disallowed}')
                 recorders = [recorder for recorder in recorders if recorder in allowed]
             self.conf['dr']['recorders'] = recorders
 
@@ -286,14 +286,15 @@ class Controller():
 
     def control_bf(self, num=1, coord=None, coordtype='celestial', targetname=None,
                    track=True, uvweight: Union[str, Callable[[float], float]]='core',
-                   flag_ants: List[str]=[],
+                   flag_ants: Union[str, List[str]]='caltable',
                    beam_gain=None, duration=0):
         """ Point and track beamformers.
         num refers to the beamformer number (1 through 8).
         If track=True, target is treated as celestial coords or by target name
         If track=False, target is treated as (az, el)
         uvweight can be: 'core', 'natural' or a function (see xengine_beamformer_control.set_beam_weights)
-        flag_ants is a list of antennas (antnames, not corrnums) to exclude from beamformer.
+        flag_ants can be name of badant set (e.g., selfcorr or gaincal or list of antnames (not corrnums).
+        Note: pol info (A/B) will be stripped to flag whole antenna.
         beam_gain optionally specifies the amplitude scaling for the beam.
         duration is time to track in seconds (0 means 12 hrs).
         target can be:
@@ -319,9 +320,14 @@ class Controller():
             logger.error(msg)
             raise KeyError(msg)
 
-        if len(flag_ants):
-            flag_ants = [mapping.antname_to_correlator(antname) for antname in flag_ants]
-        
+        # we convert antnames into corr_nums and ignore pol info
+        if isinstance(flag_ants, list):
+            flag_ants = list({f"{mapping.antname_to_correlator('LWA-'+antname.rstrip('A').rstrip('B')):03}" for antname in flag_ants})
+        elif isinstance(flag_ants, str):
+            flag_ants = list({f"{mapping.antname_to_correlator('LWA-'+antname.rstrip('A').rstrip('B')):03}" for antname in anthealth.get_badants(flag_ants)})
+        else:
+            raise RuntimeError
+
         if (callable(uvweight)):
             assert uvweight.__code__.co_argcount == 1, "weight function must only take one argument"
             self.bfc[num].set_beam_weighting(fnc=weight, flag_ants=flag_ants)
@@ -333,7 +339,7 @@ class Controller():
             raise ValueError(f'Invalid value for weight {weight}')
 
         if beam_gain:
-            self.bfc[num].set_beam_gain(beam_gain)
+            self.bfc[num].set_beam_gain(beam_gain, flag_ants=flag_ants)  # TODO: ensure flag_ants matches that used in weighting (single call?)
         if targetname is not None:
             self.bfc[num].set_beam_target(targetname)
         elif ra is not None:
@@ -361,14 +367,14 @@ class Controller():
         """
         AGE_THRESHOLD_S = 10
         fmt = '{:<16}{:<8}{:<14}{:<14}'
-        print(fmt.format("Pipeline id:", "alive", "capture_gbps", "corr_gbps"))
+        logger.info(fmt.format("Pipeline id:", "alive", "capture_gbps", "corr_gbps"))
         for pipeline in self.pipelines:
             capture_status = pipeline.capture.get_bifrost_status()
             corr_status = pipeline.corr.get_bifrost_status()
             if capture_status is None:
                 raise RuntimeError("Failed to get X-engine capture block status.")
             alive = (time.time() - corr_status['time'] < AGE_THRESHOLD_S)
-            print(fmt.format(f'{pipeline.host}:{pipeline.pipeline_id}',
+            logger.info(fmt.format(f'{pipeline.host}:{pipeline.pipeline_id}',
                              str(bool(alive)),
                              f"{capture_status['gbps']:.1f}",
                              f"{corr_status['gbps']:.1f}"))
@@ -513,7 +519,7 @@ class Controller():
                     stop = start + TimeDelta(duration/1e3/24/3600, format="jd")
                     self.stop_dr(recorders=recorder, t0=stop)
             else:
-                print(f"recorder name {recorder} not recognized.")
+                logger.info(f"recorder name {recorder} not recognized.")
                 accepted = False
 
             if not accepted:
@@ -592,7 +598,8 @@ class Controller():
             elif response['status'] == 'success':
                 logger.info(f"recording on {recorder} stopped")
             else:
-                logger.warn(f"stopping recording on {recorder} failed: {response['response']}")
+#                badrec = [k for k,v in response['response'].items() if v['status'] != 'success']
+                logger.warn(f"stopping recording on {recorder} failed: {response}")
 
 def _core_weight_func(r: float) -> float:
     return 1.0 if r < CORE_RADIUS_M else 0.0
