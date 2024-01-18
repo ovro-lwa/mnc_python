@@ -18,6 +18,10 @@ import numpy as np
 import math as m
 import time
 import warnings
+from mnc import common
+
+logger = common.get_logger(__name__)
+
 arx = lwautils.lwa_arx.ARX()
 
 adrs = range(15,46)  #addresses of ARX boards (rollout phase 3)

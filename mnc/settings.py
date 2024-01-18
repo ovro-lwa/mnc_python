@@ -68,8 +68,8 @@ class Settings():
 
         if self.filename is not None:
             self.config = mat.loadmat(self.filename, squeeze_me=True)
-            logger.info('Read data file', self.filename)
-            logger.info('Data file internal time: ',time.asctime(time.gmtime(self.config['time'])))
+            logger.info(f'Read data file {self.filename}')
+            logger.info(f'Data file internal time: {time.asctime(time.gmtime(self.config["time"]))}')
             self.cfgkeys = self.config.keys()
         else:
 #            self.config = <read from etcd>
@@ -97,7 +97,7 @@ class Settings():
         """ Load settings for f-engine to the SNAP2 boards.
         """
         
-        logger.info('Loading settings to SNAP2 boards:', snaps)
+        logger.info(f'Loading settings to SNAP2 boards: {snaps}')
 
         #=================================
         # SET F ENGINE FFT SHIFT SCHEDULE
@@ -110,7 +110,7 @@ class Settings():
 
         for i in snaps:
             ec.send_command(i,'pfb','set_fft_shift',kwargs={'shift':int(fftshift)})
-        logger.info('All FFT shifts set to','%04X' % fftshift)
+        logger.info(f'All FFT shifts set to {fftshift}')
 
 
         #=====================================

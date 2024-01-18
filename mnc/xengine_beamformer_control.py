@@ -257,7 +257,7 @@ class BeamPointingControl(object):
         calfreq = calfreq.ravel()
         tab.close()
         
-        logger.debug(f"Loaded {caldata.shape[0]} by {caldata.shape[1]} by {caldata.shape[2]} complex gains covering {calfreq[0]/1e6:.3f} to {calfreq[-1]/1e6:.3f} MHz")
+        logger.info(f"Loaded {caldata.shape[0]} by {caldata.shape[1]} by {caldata.shape[2]} complex gains covering {calfreq[0]/1e6:.3f} to {calfreq[-1]/1e6:.3f} MHz")
             
         # Validate the calibration data structure
         assert(caldata.shape[0] == NSTAND)
@@ -438,7 +438,7 @@ class BeamPointingControl(object):
             aa = sc.transform_to(AltAz(obstime=compute_time, location=obs))
             az = aa.az.deg
             alt = aa.alt.deg
-            logger.debug(f"Currently at azimuth {aa.az}, altitude {aa.alt}")
+            logger.info(f"Currently at azimuth {aa.az}, altitude {aa.alt}")
                 
         # Point the beam
         self.set_beam_pointing(az, alt, degrees=True, load_time=load_time)
@@ -521,7 +521,7 @@ class BeamTracker(object):
                 aa = sc.transform_to(AltAz(obstime=Time.now()+puto, location=obs))
                 az = aa.az.deg
                 alt = aa.alt.deg
-                logger.debug(f"At {time.time():.1f}, moving to azimuth {aa.az}, altitude {aa.alt}")
+                logger.info(f"At {time.time():.1f}, moving to azimuth {aa.az}, altitude {aa.alt}")
                     
                 ## Point
                 self.control_instance.set_beam_pointing(az, alt, degrees=True, load_time=t_mark+2)
