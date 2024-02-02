@@ -321,12 +321,10 @@ class Controller():
             raise KeyError(msg)
 
         # we convert antnames into corr_nums and ignore pol info
-        if isinstance(flag_ants, list):
-            flag_ants = list({f"{mapping.antname_to_correlator('LWA-'+antname.rstrip('A').rstrip('B')):03}" for antname in flag_ants})
-        elif isinstance(flag_ants, str):
-            flag_ants = list({f"{mapping.antname_to_correlator('LWA-'+antname.rstrip('A').rstrip('B')):03}" for antname in anthealth.get_badants(flag_ants)})
-        else:
-            raise RuntimeError
+        if isinstance(flag_ants, str):
+            mjd, flag_ants = anthealth.get_badants(flag_ants)
+        assert isinstance(flag_ants, list)
+        flag_ants = list({f"{mapping.antname_to_correlator('LWA-'+antname.rstrip('A').rstrip('B')):03}" for antname in flag_ants})
 
         if (callable(uvweight)):
             assert uvweight.__code__.co_argcount == 1, "weight function must only take one argument"
