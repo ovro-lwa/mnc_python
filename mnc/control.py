@@ -485,18 +485,17 @@ class Controller():
 
             elif recorder in [f'drt{n}' for n in range(1,3)]:
                 assert teng_f1 is not None and teng_f2 is not None, "Need to set teng_f1, teng_f2 frequencies"
-                assert teng_f1 < 196e6/2 and teng_f2 < 196e6/2, "t-engine tuning frequency too high."
                 assert (f0 > 0) and (f0 < 8), "f0 (filter number) should be from 1-7 (inclusive)"
                 if duration is not None:
                     assert time_avg in [None, 0, 1], "No time averaging can be done for t-engine"
 
                 beam = int(recorder[3:])
 
-                # central_freq defined in units of 196e9/2**32  OR NOT?
-#                teng_f1n = int(teng_f1/(196e6/2**32))
-#                teng_f2n = int(teng_f2/(196e6/2**32))
+                # scale to freq in Hz and check
+                teng_f1n = int(teng_f1*(196e6/2**32))
+                teng_f2n = int(teng_f2*(196e6/2**32))
+                assert teng_f1n < 196e6/2 and teng_f2n < 196e6/2, "t-engine tuning frequency too high."
 
-                gain = 1      # TODO: decide if gain needs to be tunable
                 accepted1, response = self.drc.send_command(f"drt{beam}", "drx", beam=beam, tuning=1,
                                                             central_freq=teng_f1, filter=f0, gain=gain1)
                 if accepted1:
