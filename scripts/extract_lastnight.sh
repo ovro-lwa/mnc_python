@@ -1,0 +1,48 @@
+#!/bin/bash
+
+workingdir="/tmp/lastnight/"
+
+mkdir -p $workingdir
+
+last=$(date --date='yesterday' '+%Y%m%d')
+
+hrs=(06 07 08 09 10 11 12)
+for hr in ${hrs[@]}
+do 
+    python3 extract_autocor.py -p /lustre/pipeline/slow/ -d $last -t $hr -w $workingdir
+done
+
+workingdir=$workingdir$last"/"
+python3 plot_autocor.py -p $workingdir
+
+
+scp /tmp/lastnight/$last/fig/{$last}_antenna_status_xx.png lwacalim10:/data10/pipeline/anthealth/
+scp /tmp/lastnight/$last/stats/{$last}.txt lwacalim10:/data10/pipeline/anthealth/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
