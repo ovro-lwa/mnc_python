@@ -415,11 +415,11 @@ class Controller():
         fast_vis_n = 0
         for corridn_a, corrid_a in enumerate(fast_corrids):
             for corridn_b, corrid_b in enumerate(fast_corrids[corridn_a:]):
-                # Add all 4 polarization products
+                # Add all 4 polarization products -- must match the order expected by the data recorder.
                 fast_vis_out[fast_vis_n+0] = [[corrid_a, 0], [corrid_b, 0]]
                 fast_vis_out[fast_vis_n+1] = [[corrid_a, 0], [corrid_b, 1]]
-                fast_vis_out[fast_vis_n+2] = [[corrid_a, 1], [corrid_b, 1]]
-                fast_vis_out[fast_vis_n+3] = [[corrid_a, 1], [corrid_b, 0]]
+                fast_vis_out[fast_vis_n+2] = [[corrid_a, 1], [corrid_b, 0]]
+                fast_vis_out[fast_vis_n+3] = [[corrid_a, 1], [corrid_b, 1]]
                 fast_vis_n += 4
         for i in range(self.npipeline*self.nhosts):
             self.pcontroller.pipelines[i].corr_subsel.set_baseline_select(fast_vis_out)
