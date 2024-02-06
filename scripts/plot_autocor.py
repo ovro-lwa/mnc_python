@@ -1,4 +1,3 @@
-
 import os
 import glob
 import copy
@@ -7,10 +6,13 @@ import time
 import numpy as np
 from matplotlib import pyplot as plt, cm
 import matplotlib.colors
-
+import seaborn as sns
 from tqdm import tqdm
-
 from scipy import signal
+
+sns.set_theme()
+sns.set_context("poster")
+
 
 def read_autocor(path: str):
     
@@ -312,8 +314,9 @@ def calc_stats(tt, freqs, antname, prefix, autocor, figdir, statdir, minfreq, ma
     # Color for False and True
     cmap = matplotlib.colors.ListedColormap(['green', 'black', 'red', 'yellow', 'blue', 'purple', 'pink'])
 
-    fig = plt.figure(figsize=(8,10))        
+    fig = plt.figure(figsize=(13,35))        
     ax  = plt.subplot(111)
+    fig.subplots_adjust(bottom=0.18)
     ax.set_title(f'XX pol Flags - {prefix[0][0:8]}')
     ax.set_xlabel("Time (min) (+%s)"%(prefix[0]))
     ax.set_ylabel('Antenna correlator number')
@@ -326,13 +329,14 @@ def calc_stats(tt, freqs, antname, prefix, autocor, figdir, statdir, minfreq, ma
     ax.set_xticks(np.arange(0, minutes[-1], 30, dtype=int))
     ax.set_xticks(np.arange(0, minutes[-1], 10, dtype=int), minor=True)
 
-    text = fig.text(0.90, 0.75, 'Flag description:\n  Black=Low power;\n  Red=Large time variability;\n  Yellow=Suspicious spectral \n  shape over the entire time\n  interval;\n  Purple=Red+Yellow;\n  Pink=Variable spectral shape.', horizontalalignment='left', wrap=True )
+    text = fig.text(0.1, 0.1, 'Flag description:  Black=Low power;\n Red=Large time variability;\n Yellow=Suspicious spectral shape over the entire time interval;\n Purple=Red+Yellow;\n Pink=Variable spectral shape.', horizontalalignment='left', transform=plt.gcf().transFigure)
     
-    fig.savefig(figdir+prefix[0][0:8]+'_antenna_status_xx.png', bbox_inches='tight', dpi=600)
+    fig.savefig(figdir+prefix[0][0:8]+'_antenna_status_xx.png', bbox_inches='tight', dpi=800)
     plt.close(fig)
     
-    fig = plt.figure(figsize=(10,10))        
+    fig = plt.figure(figsize=(13,35))        
     ax  = plt.subplot(111)
+    fig.subplots_adjust(bottom=0.18)
     ax.set_title(f'YY pol Flags - {prefix[0][0:8]}')
     ax.set_xlabel("Time (min) (+%s)"%(prefix[0]))
     ax.set_ylabel('Antenna correlator number')
@@ -344,8 +348,10 @@ def calc_stats(tt, freqs, antname, prefix, autocor, figdir, statdir, minfreq, ma
     ax.set_yticks(np.arange(0, len(antname), 1, dtype=int), minor=True)
     ax.set_xticks(np.arange(0, minutes[-1], 30, dtype=int))
     ax.set_xticks(np.arange(0, minutes[-1], 10, dtype=int), minor=True)
-    text = fig.text(0.90, 0.75, 'Flag description:\n  Black=Low power;\n  Red=Large time variability;\n  Yellow=Suspicious spectral \n  shape over the entire time\n  interval;\n  Purple=Red+Yellow;\n  Pink=Variable spectral shape.', horizontalalignment='left', wrap=True )
-    fig.savefig(figdir+prefix[0][0:8]+'_antenna_status_yy.png', bbox_inches='tight', dpi=600)
+    text = fig.text(0.1, 0.1,
+                    'Flag description: Black=Low power;\n Red=Large time variability;\n Yellow=Suspicious spectral shape over the entire time interval;\n Purple=Red+Yellow;\n  Pink=Variable spectral shape.',
+                    horizontalalignment='left', transform=plt.gcf().transFigure)
+    fig.savefig(figdir+prefix[0][0:8]+'_antenna_status_yy.png', bbox_inches='tight', dpi=800)
     plt.close(fig)
     
     # write statistics on file
