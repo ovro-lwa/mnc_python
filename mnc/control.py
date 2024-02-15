@@ -170,7 +170,7 @@ class Controller():
                 resp = ec.send_command(0, 'controller', 'stop_poll_stats_loop')
                 logger.info(f"Programming SNAP: 1 (up to 90 sec)")
                 resp = ec.send_command(1, 'feng', 'program', timeout=90, n_response_expected=1, kwargs={'fpgfile': FPG_FILE})
-                if not resp[1]:
+                if not resp:
                     raise RuntimeError('Program of snap01 failed. Check f-engine etcd service logs as pipeline@calim.')
 
                 for snap2name in snap2names:
