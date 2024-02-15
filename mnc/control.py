@@ -168,8 +168,8 @@ class Controller():
         if program:
             if (not all(is_programmed.values()) or force):
                 resp = ec.send_command(0, 'controller', 'stop_poll_stats_loop')
-                logger.info(f"Programming SNAP: 1 (up to 90 sec)")
-                resp = ec.send_command(1, 'feng', 'program', timeout=90, n_response_expected=1, kwargs={'fpgfile': FPG_FILE})
+                logger.info(f"Programming SNAP: 1 (up to 120 sec)")
+                resp = ec.send_command(1, 'feng', 'program', timeout=120, n_response_expected=1, kwargs={'fpgfile': FPG_FILE})
                 if not resp:
                     raise RuntimeError('Program of snap01 failed. Check f-engine etcd service logs as pipeline@calim.')
 
@@ -177,8 +177,8 @@ class Controller():
                 logger.info(f"Programming SNAPs: {nextnums}")
                 for snap2num in nextnums:
                     _ = ec.send_command(snap2num, 'feng', 'program', timeout=0, n_response_expected=1, kwargs={'fpgfile': FPG_FILE})
-                logger.info("Waiting 90 seconds")
-                time.sleep(90)
+                logger.info("Waiting 120 seconds (ignore error messages above)")
+                time.sleep(120)
                 is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
                 if not all(is_programmed.values()):
                     raise RuntimeError('Programming of other snaps failed. Check f-engine service logs as pipeline@calim.')
