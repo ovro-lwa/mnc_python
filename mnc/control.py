@@ -166,23 +166,31 @@ class Controller():
         is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
 
         if program:
-            if (not all(is_programmed.values()) or force) and program:
-                resp = ec.send_command(0, 'feng', 'program', timeout=90*11, n_response_expected=11, kwargs={'fpgfile': FPG_FILE})
-                if len(resp) < 11:
-                    raise RuntimeError('program failed. Check fengine etcd service logs.')
-                return resp
+            if (not all(is_programmed.values()) or force):
+                resp = ec.send_command(0, 'controller', 'stop_poll_stats_loop')
+                logger.info(f"Programming SNAP: 1 (up to 90 sec)")
+                resp = ec.send_command(1, 'feng', 'program', timeout=90, n_response_expected=1, kwargs={'fpgfile': FPG_FILE})
+                if not resp[1]:
+                    raise RuntimeError('Program of snap01 failed. Check f-engine etcd service logs as pipeline@calim.')
+
+                for snap2name in snap2names:
+                    nextnums = [int(snap2name.lstrip('snap')) for snap2name in snap2names if snap2name != 'snap01']
+                    logger.info(f"Programming SNAPs: {nextnums}")
+                    _ = ec.send_command(snap2num, 'feng', 'program', timeout=0, n_response_expected=1, kwargs={'fpgfile': FPG_FILE})
+                logger.info("Waiting 90 seconds")
+                time.sleep(90)
+                is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
+                if not all(is_programmed.values()):
+                    raise RuntimeError('Programming of other snaps failed. Check f-engine service logs as pipeline@calim.')
             else:
                 logger.info('All snaps already programmed.')
 
         if initialize:
             is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
             if len(is_programmed) != 11 or not all(is_programmed.values()):
-                logger.info('Not all SNAPs programmed. Try waiting 30s before checking after programming command sent.')
-                return is_programmed
+                raise RuntimeError('Not all SNAPs programmed. Cannot initialize them.')
 
-            if program:
-                logger.info('Waiting 120s to initialize board after programming. You may need to restart f-eng etcd services NOW.')
-                time.sleep(120)
+            resp = ec.send_command(0, 'controller', 'stop_poll_stats_loop')
 
             for snap2name in snap2names:
                 print(f"Initializing board {snap2name}")
@@ -191,8 +199,10 @@ class Controller():
                                         kwargs={'config_file': self.config_file, 'program': False, 'initialize': True},
                                         timeout=90)
 
-                if resp is not None:
+                if resp[snap2num] is None:
                     raise RuntimeError(f'cold_start_from_config failed for board {snap2name}. Check fengine etcd service logs.')
+
+            resp = ec.send_command(0, 'controller', 'start_poll_stats_loop')
 
             if updatesettings:
                 settings.update()
