@@ -173,9 +173,9 @@ class Controller():
                 if not resp:
                     raise RuntimeError('Program of snap01 failed. Check f-engine etcd service logs as pipeline@calim.')
 
-                for snap2name in snap2names:
-                    nextnums = [int(snap2name.lstrip('snap')) for snap2name in snap2names if snap2name != 'snap01']
-                    logger.info(f"Programming SNAPs: {nextnums}")
+                nextnums = [int(snap2name.lstrip('snap')) for snap2name in snap2names if snap2name != 'snap01']
+                logger.info(f"Programming SNAPs: {nextnums}")
+                for snap2num in nextnums:
                     _ = ec.send_command(snap2num, 'feng', 'program', timeout=0, n_response_expected=1, kwargs={'fpgfile': FPG_FILE})
                 logger.info("Waiting 90 seconds")
                 time.sleep(90)
