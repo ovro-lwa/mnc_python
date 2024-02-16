@@ -189,8 +189,8 @@ class Controller():
 
             resp = ec.send_command(1, 'feng', 'cold_start_from_config',
                                    kwargs={'config_file': self.config_file, 'program': True, 'initialize': True},
-                                   timeout=90)
-            if not resp[1]:
+                                   timeout=120)
+            if resp is None:
                 raise RuntimeError('cold_start_from_config failed. Check f-engine etcd service logs as pipeline@calim.')
 
             for snap2name in snap2names:
