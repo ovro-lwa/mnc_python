@@ -165,33 +165,50 @@ class Controller():
         is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
 
         if program:
-            if (not all(is_programmed.values()) or force) and program:
-                resp = ec.send_command(0, 'feng', 'program', timeout=90*11, n_response_expected=11, kwargs={'fpgfile': FPG_FILE})
-                if len(resp) < 11:
-                    raise RuntimeError('program failed. Check fengine etcd service logs.')
-                return resp
+            if (not all(is_programmed.values()) or force):
+                resp = ec.send_command(0, 'feng', 'program', timeout=120, n_response_expected=1, kwargs={'fpgfile': FPG_FILE})
+                if not resp:
+                    raise RuntimeError('Programming failed. Check f-engine etcd service logs as pipeline@calim.')
+                logger.info("Waiting 120 seconds (ignore error messages above)")
+                time.sleep(120)
+
+                is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
+                if not all(is_programmed.values()):
+                    raise RuntimeError('Programming of other snaps failed. Check f-engine service logs as pipeline@calim.')
+                else:
+                    logger.info("All snaps programmed")
+                resp = ec.send_command(0, 'controller', 'stop_poll_stats_loop')
             else:
                 logger.info('All snaps already programmed.')
 
-        if initialize:
+        if initialize or program:
             is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
-            if len(is_programmed) != 11 or not all(is_programmed.values()):
-                logger.info('Not all SNAPs programmed. Try waiting 30s before checking after programming command sent.')
-                return is_programmed
+            if len(is_programmed) != 11 or not all(is_programmed.values()) or force:
+                raise RuntimeError('Not all SNAPs programmed. Cannot initialize them.')
 
-            if program:
-                logger.info('Waiting 120s to initialize board after programming. You may need to restart f-eng etcd services NOW.')
-                time.sleep(120)
+            resp = ec.send_command(0, 'controller', 'stop_poll_stats_loop')
+
+            resp = ec.send_command(1, 'feng', 'cold_start_from_config',
+                                   kwargs={'config_file': self.config_file, 'program': True, 'initialize': True},
+                                   timeout=120)
+            if resp is None:
+                raise RuntimeError('cold_start_from_config failed. Check f-engine etcd service logs as pipeline@calim.')
 
             for snap2name in snap2names:
-                print(f"Initializing board {snap2name}")
+                if snap2name == 'snap01':
+                    continue
+                logger.info(f"Initializing board {snap2name}")
                 snap2num = int(snap2name.lstrip('snap'))
                 resp = ec.send_command(snap2num, 'feng', 'cold_start_from_config',
-                                        kwargs={'config_file': self.config_file, 'program': False, 'initialize': True},
-                                        timeout=90)
+                                        kwargs={'config_file': self.config_file, 'program': True, 'initialize': True},
+                                        timeout=0)
 
-                if resp is not None:
-                    raise RuntimeError(f'cold_start_from_config failed for board {snap2name}. Check fengine etcd service logs.')
+            logger.info("Waiting 120 seconds (ignore warning messages above)")
+            time.sleep(120)
+            resp = ec.send_command(0, 'controller', 'start_poll_stats_loop')
+            is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
+            if len(is_programmed) != 11 or not all(is_programmed.values()):
+                raise RuntimeError('Not all SNAPs programmed. Check logs.')
 
             if updatesettings:
                 settings.update()
