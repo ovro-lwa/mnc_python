@@ -1,6 +1,5 @@
 import os.path
 import glob
-import sys
 import scipy.io as mat
 import time
 import numpy as np
@@ -86,9 +85,8 @@ class Settings():
 
     def get_last_settings(self, path='/home/pipeline/proj/lwa-shell/mnc_python/data/'):
         """ Look at standard log file and read last entry.
+        TODO: use obssatte or etcd to get last settings.
         """
-
-        # TODO: use etcd for this
 
         with open(path+'arxAndF-settings.log','r') as f:
             return os.path.join(DATAPATH, f.readlines()[-1].split()[-2])
