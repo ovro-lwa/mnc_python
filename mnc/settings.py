@@ -83,13 +83,13 @@ class Settings():
         for j,k in enl:
             logger.info(f'{j}: {k[0]}')
 
-    def get_last_settings(self, path='/home/pipeline/proj/lwa-shell/mnc_python/data/'):
-        """ Look at standard log file and read last entry.
-        TODO: use obssatte or etcd to get last settings.
+    def get_last_settings(self): #, path='/home/pipeline/proj/lwa-shell/mnc_python/data/'):
+        """ Use obsstate to read last settings loaded.
         """
 
-        with open(path+'arxAndF-settings.log','r') as f:
-            return os.path.join(DATAPATH, f.readlines()[-1].split()[-2])
+        return obsstate.read_latest_setting()
+#        with open(path+'arxAndF-settings.log','r') as f:
+#            return os.path.join(DATAPATH, f.readlines()[-1].split()[-2])
 
     def load_feng(self):
         """ Load settings for f-engine to the SNAP2 boards.
@@ -287,7 +287,7 @@ def update(filename=LATEST_SETTINGS):
     settings = Settings(filename=filename)
     settings.load_feng()
     settings.load_arx()
-    settings.update_log()
+    settings.update_log()   # TODO: migrate away from this and to obsstate
     try:
 #        t_now = time.asctime(time.gmtime(time.time()))  # let add_settings handle this
         obsstate.add_settings(filename)
