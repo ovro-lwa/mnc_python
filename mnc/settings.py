@@ -1,6 +1,5 @@
 import os.path
 import glob
-import sys
 import scipy.io as mat
 import time
 import numpy as np
@@ -8,8 +7,8 @@ import getpass
 
 from mnc import myarx as a
 from mnc import common
+from lwa_antpos import mapping
 from observing import obsstate
-
 
 DATAPATH = '/home/pipeline/proj/lwa-shell/mnc_python/data/'
 LATEST_SETTINGS = sorted([(fn, os.path.basename(fn).split('-')[0]) for fn in glob.glob(DATAPATH + '/*mat')], key=lambda x: x[1])[-1][0]
@@ -26,16 +25,11 @@ def dsig2feng(digitalSignal): # From digital sig num calculate F-unit location a
     fsig = digitalSignal % 64          # FPGA signal number, 0:63
     return (funit,fsig)
 
-
 def a2arx(asig): # asig to ARX address and ARX channel number
     adr = int(asig/16)
     chan = asig - 16*adr + 1  # channel number is 1-based
     adr += 1                  # address is 1-based
     return(adr,chan)
-
-
-isodd = lambda a: bool(a % 2)
-
 
 try:
     from lwa_f import snap2_feng_etcd_client
@@ -93,7 +87,7 @@ class Settings():
         with open(path+'arxAndF-settings.log','r') as f:
             return os.path.join(DATAPATH, f.readlines()[-1].split()[-2])
 
-    def load_feng(self):
+    def load_feng(self, zero_unused_feng_input=False):
         """ Load settings for f-engine to the SNAP2 boards.
         """
         
@@ -234,22 +228,22 @@ class Settings():
 
         logger.info('TURNING OFF SPECIFIED SIGNALS')
         print('TURNING OFF SPECIFIED SIGNALS')
-        off = []
         if 'off' in self.cfgkeys:
             off = self.config['off']
             for dsig in off:
-                # Set F engine input to zero
-                feng = dsig2feng(dsig)
-                fpga = feng[0]
-                fsig = feng[1]
-                ec.send_command(fpga, 'input', 'use_zero', kwargs={'stream':int(fsig)})
+                if zero_unused_feng_input:
+                    # Set F engine input to zero
+                    feng = dsig2feng(dsig)
+                    fpga = feng[0]
+                    fsig = feng[1]
+                    ec.send_command(fpga, 'input', 'use_zero', kwargs={'stream':int(fsig)})
 
                 # Turn off ARX input DC power (FEE or photodiode)
-                pol = 'B' if isodd(dsig) else 'A'
                 antname = mapping.correlator_to_antname(dsig//2)
+                pol = 'A' if (dsig % 2 == 0) else 'B'
                 address, channel = mapping.antpol_to_arx(antname, pol)
                 a.feeOff(address, channel)
-        print('Turned off',len(off),'signals: dsig=',off)        
+            print('Turned off',len(off),'signals: dsig=',off)        
 
 
     def load_arx(self):
@@ -287,8 +281,9 @@ class Settings():
 
 def update(filename=LATEST_SETTINGS):
     settings = Settings(filename=filename)
-    settings.load_feng()
+    # watch out for the order of load_arx and load_feng, load_feng currently calls feeOff through ARX.
     settings.load_arx()
+    settings.load_feng()
     settings.update_log()
     try:
 #        t_now = time.asctime(time.gmtime(time.time()))  # let add_settings handle this
