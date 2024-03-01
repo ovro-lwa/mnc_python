@@ -10,7 +10,7 @@ from mnc import common
 from lwa_antpos import mapping
 from observing import obsstate
 
-DATAPATH = '/home/pipeline/proj/lwa-shell/mnc_python/data/'
+DATAPATH = '/home/pipeline/opsdata'
 LATEST_SETTINGS = sorted([(fn, os.path.basename(fn).split('-')[0]) for fn in glob.glob(DATAPATH + '/*mat')], key=lambda x: x[1])[-1][0]
 
 # Constants
@@ -269,7 +269,7 @@ class Settings():
             except:
                 continue
 
-    def update_log(self, path='/home/pipeline/proj/lwa-shell/mnc_python/data/'):
+    def update_log(self, path='/home/pipeline/opsdata/'):
         """ Add line to logging file
         """
 
