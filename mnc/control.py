@@ -2,9 +2,8 @@ import os.path
 import yaml
 import logging
 from typing import Union, Callable, List
-import glob
+import warnings
 import numpy as np
-import glob
 from dsautils import dsa_store
 from lwautils import lwa_arx   # arx
 from lwa_antpos import mapping
@@ -239,14 +238,22 @@ class Controller():
 
         return timestamp, stats
 
-    def configure_xengine(self, recorders=None, calibratebeams=False, full=False, timeout=300, force=False):
-        """ Restart xengine. Configure pipelines to send data to recorders.
-        Recorders is list of recorders to configure output to. Defaults to those in config file.
-        Supported recorders are "drvs" (slow vis), "drvf" (fast vis), "dr[n]" (power beams), "drt1" (teng)
-        Option "full" will stop/start/clear pipelines/beamformer controllers.
-        force will apply beam calibration, even if already applied in x-engines.
-        timeout is for x-engine start_pipelines method.
+    def configure_xengine(self, recorders=None, calibratebeams=False, full=False, timeout=None, force=False):
+        """ 
+        Configure the xengines for beamforming.
+
+        TODO we should really rearlly really lump this into control_bf.
+        
+        Args:
+            recorders (list or None): List of recorders (drN) to configure.
+            calibratebeams (bool): whether to use calibration for the beams
+            full (bool): Stop and restart the xengines before configuring.
+            force (bool): Force loading of calibration to beam.
         """
+        if timeout is not None:
+            warnings.warn(
+                'timeout argument in configure_xengine is deprecated. It is not needed.',
+                DeprecationWarning, 2)
 
         dconf = self.conf['dr']
         if recorders is None:
@@ -255,13 +262,15 @@ class Controller():
             recorders = [recorders,]
 
         if full:
-            logger.info("Stopping/starting pipelines with 20s sleep")
-            # stop before starting
-            self.pcontroller.stop_pipelines()
+            warnings.warn(
+                'full argument in configure_xengine to be deprecated. '
+                'Use stop_xengine and start_xengine instead if you want to restart x engine. '
+                'Usually it is not needed.',
+                DeprecationWarning, 2)
             self.stop_xengine()
-            self.start_xengine(timeout=timeout)
             # Clear the beamformer state
             self.bfc.clear()
+            self.start_xengine()
 
         logger.info(f'pipelines up? {self.pcontroller.pipelines_are_up()}')
         if not self.pcontroller.pipelines_are_up():
