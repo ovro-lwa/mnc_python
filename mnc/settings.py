@@ -78,14 +78,13 @@ class Settings():
         for j,k in enl:
             logger.info(f'{j}: {k[0]}')
 
-    def get_last_settings(self, path='/home/pipeline/proj/lwa-shell/mnc_python/data/'):
-        """ Look at standard log file and read last entry.
+    def get_last_settings(self): #, path='/home/pipeline/proj/lwa-shell/mnc_python/data/'):
+        """ Use obsstate to read last settings loaded.
         """
 
-        # TODO: use etcd for this
-
-        with open(path+'arxAndF-settings.log','r') as f:
-            return os.path.join(DATAPATH, f.readlines()[-1].split()[-2])
+        return obsstate.read_latest_setting()
+#        with open(path+'arxAndF-settings.log','r') as f:
+#            return os.path.join(DATAPATH, f.readlines()[-1].split()[-2])
 
     def load_feng(self, zero_unused_feng_input=False):
         """ Load settings for f-engine to the SNAP2 boards.
@@ -283,8 +282,8 @@ def update(filename=LATEST_SETTINGS):
     settings = Settings(filename=filename)
     # watch out for the order of load_arx and load_feng, load_feng currently calls feeOff through ARX.
     settings.load_arx()
+    settings.update_log()   # TODO: migrate away from this and to obsstate
     settings.load_feng()
-    settings.update_log()
     try:
 #        t_now = time.asctime(time.gmtime(time.time()))  # let add_settings handle this
         obsstate.add_settings(filename)
