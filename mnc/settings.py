@@ -10,8 +10,12 @@ from mnc import common
 from lwa_antpos import mapping
 from observing import obsstate
 
-DATAPATH = '/home/pipeline/proj/lwa-shell/mnc_python/data/'
-LATEST_SETTINGS = sorted([(fn, os.path.basename(fn).split('-')[0]) for fn in glob.glob(DATAPATH + '/*mat')], key=lambda x: x[1])[-1][0]
+DATAPATH = '/home/pipeline/opsdata'
+LIST_SETTINGS = sorted([(fn, os.path.basename(fn).split('-')[0]) for fn in glob.glob(DATAPATH + '/*settings*mat')], key=lambda x: x[1])
+if len(LIST_SETTINGS):
+    LATEST_SETTINGS = LIST_SETTINGS[-1][0]
+else:
+    LATEST_SETTINGS = None
 
 # Constants
 DELAY_OFFSET = 10 # minimum delay
@@ -78,13 +82,16 @@ class Settings():
         for j,k in enl:
             logger.info(f'{j}: {k[0]}')
 
-    def get_last_settings(self): #, path='/home/pipeline/proj/lwa-shell/mnc_python/data/'):
+    def get_last_settings(self):
         """ Use obsstate to read last settings loaded.
         """
 
-        return obsstate.read_latest_setting()
-#        with open(path+'arxAndF-settings.log','r') as f:
-#            return os.path.join(DATAPATH, f.readlines()[-1].split()[-2])
+        try:
+            return obsstate.read_latest_setting()
+        except Exception as exc:
+            logger.warn(f"Failed to read settings from database. Using logfile")
+            with open(path+'arxAndF-settings.log','r') as f:
+                return os.path.join(DATAPATH, f.readlines()[-1].split()[-2])
 
     def load_feng(self, zero_unused_feng_input=False):
         """ Load settings for f-engine to the SNAP2 boards.
