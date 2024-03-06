@@ -313,7 +313,7 @@ class Controller():
     def control_bf(self, num=1, coord=None, coordtype='celestial', targetname=None,
                    track=True, uvweight: Union[str, Callable[[float], float]]='core',
                    flag_ants: Union[str, List[str]]='caltable',
-                   beam_gain=None, duration=0):
+                   beam_gain=1, duration=0):
         """ Point and track beamformers.
         num refers to the beamformer number (1 through 8).
         If track=True, target is treated as celestial coords or by target name
