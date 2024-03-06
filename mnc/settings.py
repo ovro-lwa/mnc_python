@@ -62,7 +62,7 @@ class Settings():
         """
 
         if filenum is not None and filename is None:
-            filename = sorted([(fn, os.path.basename(fn).split('-')[0]) for fn in glob.glob(DATAPATH + '/*mat')], key=lambda x: x[1])[filenum][0]
+            filename = LIST_SETTINGS[filenum][0]
             self.filename = filename
 
         if self.filename is not None:
@@ -79,8 +79,7 @@ class Settings():
         
         """
 
-        enl = enumerate(sorted([(fn, os.path.basename(fn).split('-')[0]) for fn in glob.glob(DATAPATH + '/*mat')], key=lambda x: x[1]))
-        for j,k in enl:
+        for j,k in LIST_SETTINGS:
             logger.info(f'{j}: {k[0]}')
 
     def get_last_settings(self):
@@ -277,7 +276,7 @@ class Settings():
             except:
                 continue
 
-    def update_log(self, path='/home/pipeline/opsdata/'):
+    def update_log(self, path=DATAPATH):
         """ Add line to logging file
         """
 
