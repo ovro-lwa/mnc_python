@@ -317,7 +317,6 @@ class BeamPointingControl(object):
         """
         
         assert(gain >= 0)
-        # normalize gain by n_ant/n_ant_max
         gain_antcount = (len(self.station.antennas)-len(flag_ants))**2
         self._gain = float(gain)/gain_antcount
         
