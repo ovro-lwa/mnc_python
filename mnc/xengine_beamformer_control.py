@@ -300,8 +300,8 @@ class BeamPointingControl(object):
                 for pol in range(NPOL):
                     cal = 1./caldata[j,i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol].ravel()
                     cal = numpy.where(numpy.isfinite(cal), cal, 0)
-                    flg = flgdata[j,i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol].ravel()
-                    cal *= (1-flg)
+#                    flg = flgdata[j,i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol].ravel()
+#                    cal *= (1-flg)
                     to_execute.append(push_gains(p, ii, 2*(self.beam-1)+pol, NPOL*j+pol, cal))
         loop.run_until_complete(asyncio.gather(*to_execute, loop=loop))
         loop.close()
@@ -317,8 +317,7 @@ class BeamPointingControl(object):
         """
         
         assert(gain >= 0)
-        # normalize gain by n_ant/n_ant_max
-        gain_antcount = (len(self.station.antennas)-len(flag_ants))/len(self.station.antennas)
+        gain_antcount = (len(self.station.antennas)-len(flag_ants))**2
         self._gain = float(gain)/gain_antcount
         
     def set_beam_weighting(self, fnc=lambda x: 1.0,
