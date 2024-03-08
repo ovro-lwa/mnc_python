@@ -331,7 +331,9 @@ class BeamPointingControl(object):
                 pos=np.where(gain[:,i,j]<1e-3)[0]  #### flagged antennas will be set to 0
                 num_flagged_ant=len(np.union1d(pos,flagged_ant))
                 gain_antcount = (len(self.station.antennas)-num_flagged_ant)
-                gain[:,i,j]/= gain_antcount
+                gain[:,i,j]/= gain_antcount  ### the power beam is nomalised by n_ant^2.
+                                            ### gains are applied to voltages. Hence the 
+                                            ### scaling is n_ant
                 
         self._gain = float(gain)#/gain_antcount
         
