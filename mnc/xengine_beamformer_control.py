@@ -300,8 +300,8 @@ class BeamPointingControl(object):
                 for pol in range(NPOL):
                     cal = 1./caldata[j,i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol].ravel()
                     cal = numpy.where(numpy.isfinite(cal), cal, 0)
-#                    flg = flgdata[j,i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol].ravel()
-#                    cal *= (1-flg)
+                    flg = flgdata[j,i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol].ravel()
+                    cal *= (1-flg)
                     to_execute.append(push_gains(p, ii, 2*(self.beam-1)+pol, NPOL*j+pol, cal))
         loop.run_until_complete(asyncio.gather(*to_execute, loop=loop))
         loop.close()
@@ -317,8 +317,23 @@ class BeamPointingControl(object):
         """
         
         assert(gain >= 0)
-        gain_antcount = (len(self.station.antennas)-len(flag_ants))**2
-        self._gain = float(gain)/gain_antcount
+        
+        shape=gain.shape
+        num_ant=shape[0]
+        num_chan=shape[1]
+        num_pol=shape[2]
+       
+        
+        flagged_ant=np.array(flag_ants)
+        
+        for i in range(num_chan):
+            for j in range(num_pol):
+                pos=np.where(gain[:,i,j]<1e-3)[0]  #### flagged antennas will be set to 0
+                num_flagged_ant=len(np.union1d(pos,flagged_ant))
+                gain[:,i,j]/=num_flagged_ant
+        
+        #gain_antcount = (len(self.station.antennas)-len(flag_ants))**2
+        self._gain = float(gain)#/gain_antcount
         
     def set_beam_weighting(self, fnc=lambda x: 1.0,
                            flag_ants: List[int]=[]):
