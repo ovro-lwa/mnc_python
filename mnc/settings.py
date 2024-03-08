@@ -90,7 +90,7 @@ class Settings():
             return obsstate.read_latest_setting()
         except Exception as exc:
             logger.warn(f"Failed to read settings from database. Using logfile")
-            with open(path+'arxAndF-settings.log','r') as f:
+            with open(os.path.join(path, 'arxAndF-settings.log'), 'r') as f:
                 return os.path.join(DATAPATH, f.readlines()[-1].split()[-2])
 
     def load_feng(self, zero_unused_feng_input=False):
@@ -280,7 +280,7 @@ class Settings():
         """ Add line to logging file
         """
 
-        with open(path+'arxAndF-settings.log','a') as f:
+        with open(os.path.join(path, 'arxAndF-settings.log'), 'a') as f:
             t = time.time()
             print(time.asctime(time.gmtime(t)), t, getpass.getuser(), os.path.basename(self.filename), self.config['time'], sep='\t',file=f)
 
