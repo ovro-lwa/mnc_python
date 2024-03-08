@@ -330,9 +330,9 @@ class BeamPointingControl(object):
             for j in range(num_pol):
                 pos=np.where(gain[:,i,j]<1e-3)[0]  #### flagged antennas will be set to 0
                 num_flagged_ant=len(np.union1d(pos,flagged_ant))
-                gain[:,i,j]/=num_flagged_ant
-        
-        #gain_antcount = (len(self.station.antennas)-len(flag_ants))**2
+                gain_antcount = (len(self.station.antennas)-num_flagged_ant)
+                gain[:,i,j]/= gain_antcount
+                
         self._gain = float(gain)#/gain_antcount
         
     def set_beam_weighting(self, fnc=lambda x: 1.0,
