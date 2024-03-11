@@ -1,4 +1,3 @@
-# myarx.py ARX control/monitor using raw()
 # 20220112 - add functions 'gainAdjust', 'filterSelect'.
 # 20220310 - add rfPowerSave().
 # 20221014 - revise status_asig() not to get rfPowerOffset if provided by caller.
@@ -10,7 +9,7 @@
 # 20230628 - feeOn(), feeOff():  add option to control a single channel.
 # 20230809 - fix bugs in feeOn() and feeOff() for single-channel control.
 # 20231114 - fix bug in status() when offsets not given.
-
+# 20240307 - Remove obsolete code lines.  Use opsdatapath.py for log file.
 
 import lwautils.lwa_arx
 import sys
@@ -18,17 +17,18 @@ import numpy as np
 import math as m
 import time
 import warnings
-from mnc import common
-
-logger = common.get_logger(__name__)
 
 arx = lwautils.lwa_arx.ARX()
 
-adrs = range(15,46)  #addresses of ARX boards (rollout phase 3)
-RFPOWEROFFSETLOG = '/home/ldaddario/arxPowerOffsets.log'
+from mnc import opsdatapath
+RFPOWEROFFSETLOG = opsdatapath.OPSDATAPATH + 'arxPowerOffsets.log'
 
 def raw(adr,cmd):
-    r = arx.raw(adr,cmd)
+    r = []
+    try:
+        r = arx.raw(adr,cmd)
+    except:
+        pass
     return r
 
 def raw2int(adr,cmd):
