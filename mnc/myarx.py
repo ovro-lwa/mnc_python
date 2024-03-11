@@ -20,7 +20,7 @@ import warnings
 
 arx = lwautils.lwa_arx.ARX()
 
-import opsdatapath
+from mnc import opsdatapath
 RFPOWEROFFSETLOG = opsdatapath.OPSDATAPATH + 'arxPowerOffsets.log'
 
 def raw(adr,cmd):
