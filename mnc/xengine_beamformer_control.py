@@ -233,7 +233,7 @@ class BeamPointingControl(object):
                 return i
         raise ValueError(f"Cannot associate {first_freq/1e6:.3f} to {last_freq/1e6:.3f} MHz with any pipeline currently under control")
         
-    def set_beam_calibration(self, caltable, verbose=True):
+    def set_beam_calibration(self, caltable, verbose=True, flag_ants: List[int]=[]):
         """
         Given a a CASA measurement set containing a bandpass calibration, load
         the bandpass calibration into the appropriate pipeline(s).
@@ -287,11 +287,26 @@ class BeamPointingControl(object):
         if len(subband_pipelines) != NPIPELINE_SUBBAND:
             logger.warning(f"Found {len(subband_pipelines)} pipelines associated with these data instead of the expected {NPIPELINE_SUBBAND}")
             
+            
+        num_chan=len(subband_pipelines)*NCHAN_PIPELINE
+        norm_factors=np.ones((num_chan,NPOL),dtype=float)
+        flagged_ant=np.array(flag_ants)
+        
+        #### setting the normalisation for each channel and polarisation
+        for i in range(num_chan):
+            for j in range(num_pol):
+                pos=np.where(flag[:,i,j])[0]  
+                num_flagged_ant=len(np.union1d(pos,flagged_ant))  
+                gain_antcount = (len(self.station.antennas)-num_flagged_ant)  
+                norm_factors[i,j]=gain_antcount  
+            
         # Set the coefficients - this is slow
         async def push_gains(pp, ii, beam_id, input_id, g):
             with AllowedPipelineFailure(pp):
                 pp.beamform.update_calibration_gains(beam_id, input_id, g)
             self._cal_set[ii] = True
+        
+          
 
         loop = asyncio.new_event_loop()
         to_execute = []
@@ -301,7 +316,7 @@ class BeamPointingControl(object):
                     cal = 1./caldata[j,i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol].ravel()
                     cal = numpy.where(numpy.isfinite(cal), cal, 0)
                     flg = flgdata[j,i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol].ravel()
-                    cal *= (1-flg)
+                    cal *= (1-flg)/norm_factors[:,pol]
                     to_execute.append(push_gains(p, ii, 2*(self.beam-1)+pol, NPOL*j+pol, cal))
         loop.run_until_complete(asyncio.gather(*to_execute, loop=loop))
         loop.close()
@@ -317,20 +332,6 @@ class BeamPointingControl(object):
         """
         
         assert(gain >= 0)
-        
-        shape=gain.shape
-        num_ant=shape[0]
-        num_chan=shape[1]
-        num_pol=shape[2]
-       
-        
-        flagged_ant=np.array(flag_ants)
-        
-        for i in range(num_chan):
-            for j in range(num_pol):
-                pos=np.where(gain[:,i,j]<1e-3)[0]  #### flagged antennas will be set to 0
-                num_flagged_ant=len(np.union1d(pos,flagged_ant))
-                gain[:,i,j]/=num_flagged_ant
         
         #gain_antcount = (len(self.station.antennas)-len(flag_ants))**2
         self._gain = float(gain)#/gain_antcount
@@ -557,7 +558,7 @@ class BeamTracker(object):
 
 def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4,
                          cal_directory='/home/ubuntu/mmanders/caltables/latest/', force=False,
-                         etcdhost=ETCD_HOST):
+                         etcdhost=ETCD_HOST, flag_ants: List[int]=[]):
     """
     Wraper to create a new BeamPointingControl instance and load bandpass
     calibration data from a directory.
@@ -585,7 +586,7 @@ def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4,
         
         # Load the calibration data, if found
         for calfile in calfiles:
-            control_instance.set_beam_calibration(calfile, beam)
+            control_instance.set_beam_calibration(calfile, beam, flag_ants= flag_ants)
             try:
                 obsstate.add_calibrations(calfile, beam)
             except Exception as exc:
