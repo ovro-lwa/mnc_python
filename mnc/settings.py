@@ -280,7 +280,7 @@ class Settings():
         """ Add line to logging file
         """
 
-        with open(path+'arxAndF-settings.log','a') as f:
+        with open(path+'/arxAndF-settings.log','a') as f:
             t = time.time()
             print(time.asctime(time.gmtime(t)), t, getpass.getuser(), os.path.basename(self.filename), self.config['time'], sep='\t',file=f)
 
