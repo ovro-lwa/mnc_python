@@ -21,7 +21,7 @@ from astropy.coordinates import solar_system_ephemeris, get_body
 from astropy.constants import c as speedOfLight
 speedOfLight = speedOfLight.to('m/ns').value
 
-print (speedOfLight)
+
 
 
 from lwa_antpos.station import ovro
@@ -295,7 +295,7 @@ class BeamPointingControl(object):
         norm_factors=numpy.ones((num_chan,NPOL),dtype=float)
         flagged_ant=numpy.array(flag_ants)
        
-        print (flgdata.shape)
+       
         #### setting the normalisation for each channel and polarisation
         for i in range(num_chan):
             for j in range(NPOL):
