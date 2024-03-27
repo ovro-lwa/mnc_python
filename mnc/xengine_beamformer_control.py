@@ -300,9 +300,6 @@ class BeamPointingControl(object):
         for i in range(num_chan):
             for j in range(NPOL):
                 pos=numpy.where(flgdata[:,i,j])[0] 
-                print (pos)
-                print (flagged_ant)
-                print (len(pos),len(flagged_ant))
                 num_flagged_ant=len(numpy.union1d(pos,flagged_ant))  
                 gain_antcount = (len(self.station.antennas)-num_flagged_ant)  
                 norm_factors[i,j]=gain_antcount  
