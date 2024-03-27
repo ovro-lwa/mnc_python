@@ -21,6 +21,9 @@ from astropy.coordinates import solar_system_ephemeris, get_body
 from astropy.constants import c as speedOfLight
 speedOfLight = speedOfLight.to('m/ns').value
 
+print (speedOfLight)
+
+
 from lwa_antpos.station import ovro
 
 from mnc.common import NPIPELINE, chan_to_freq, ETCD_HOST, get_logger
@@ -289,14 +292,18 @@ class BeamPointingControl(object):
             
             
         num_chan=len(subband_pipelines)*NCHAN_PIPELINE
-        norm_factors=np.ones((num_chan,NPOL),dtype=float)
-        flagged_ant=np.array(flag_ants)
-        
+        norm_factors=numpy.ones((num_chan,NPOL),dtype=float)
+        flagged_ant=numpy.array(flag_ants)
+       
+        print (flgdata.shape)
         #### setting the normalisation for each channel and polarisation
         for i in range(num_chan):
-            for j in range(num_pol):
-                pos=np.where(flag[:,i,j])[0]  
-                num_flagged_ant=len(np.union1d(pos,flagged_ant))  
+            for j in range(NPOL):
+                pos=numpy.where(flgdata[:,i,j])[0] 
+                print (pos)
+                print (flagged_ant)
+                print (len(pos),len(flagged_ant))
+                num_flagged_ant=len(numpy.union1d(pos,flagged_ant))  
                 gain_antcount = (len(self.station.antennas)-num_flagged_ant)  
                 norm_factors[i,j]=gain_antcount  
             
@@ -316,7 +323,7 @@ class BeamPointingControl(object):
                     cal = 1./caldata[j,i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol].ravel()
                     cal = numpy.where(numpy.isfinite(cal), cal, 0)
                     flg = flgdata[j,i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol].ravel()
-                    cal *= (1-flg)/norm_factors[:,pol]
+                    cal *= (1-flg)/norm_factors[i*NCHAN_PIPELINE:(i+1)*NCHAN_PIPELINE,pol]
                     to_execute.append(push_gains(p, ii, 2*(self.beam-1)+pol, NPOL*j+pol, cal))
         loop.run_until_complete(asyncio.gather(*to_execute, loop=loop))
         loop.close()
