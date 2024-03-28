@@ -238,7 +238,7 @@ class Controller():
 
         return timestamp, stats
 
-    def configure_xengine(self, recorders=None, calibratebeams=False, full=False, timeout=None, force=False):
+    def configure_xengine(self, recorders=None, calibratebeams=False, full=False, timeout=None, force=False, flag_ants: List[int]=[]):
         """ 
         Configure the xengines for beamforming.
 
@@ -293,7 +293,8 @@ class Controller():
                                                                                 nserver=len(self.xhosts_up),
                                                                                 npipeline_per_server=self.npipeline,
                                                                                 cal_directory=cal_directory,
-                                                                                etcdhost=self.etcdhost, force=force)
+                                                                                etcdhost=self.etcdhost, force=force,
+                                                                                flag_ants=flag_ants)
             except KeyError:
                 logger.error("KeyError when creating beamformer control. Are data being sent from f to x-engines?")
 
