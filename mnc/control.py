@@ -30,6 +30,15 @@ FPG_FILE = '/home/pipeline/proj/lwa-shell/caltech-lwa/snap2_f_200msps_64i_4096c/
 
 CORE_RADIUS_M = 200.0
 
+#: List of T-engine filter codes and their corresponding sample rates in Hz
+VOLT_FILTER_CODES = {1:   250000,
+                     2:   500000,
+                     3:  1000000,
+                     4:  2000000,
+                     5:  4900000,
+                     6:  9800000,
+                     7: 19600000}
+
 class Controller():
     """ Parse configuration and control all subsystems in uniform manner.
     Ideally, will also make it easy to monitor basic system status.
@@ -512,14 +521,17 @@ class Controller():
 
             elif recorder in [f'drt{n}' for n in range(1,3)]:
                 assert teng_f1 is not None and teng_f2 is not None, "Need to set teng_f1, teng_f2 frequencies"
-                assert (f0 > 0) and (f0 < 8), "f0 (filter number) should be from 1-7 (inclusive)"
+                assert f0 in VOLT_FILTER_CODES, "f0 (filter number) should be from 1-7 (inclusive)"
                 if duration is not None:
                     assert time_avg in [None, 0, 1], "No time averaging can be done for t-engine"
 
                 beam = int(recorder[3:])
 
                 # Check for valid tunings
-                assert teng_f1 < 196e6/2 and teng_f2 < 196e6/2, "t-engine tuning frequency too high."
+                assert teng_f1 > VOLT_FILTER_CODES[f0]/2, "t-engine tuning 1 frequency too low."
+                assert teng_f2 > VOLT_FILTER_CODES[f0]/2, "t-engine tuning 2 frequency too low."
+                assert teng_f1 < (196e6/2-VOLT_FILTER_CODES[f0]/2), "t-engine tuning 1 frequency too high."
+                assert teng_f2 < (196e6/2-VOLT_FILTER_CODES[f0]/2), "t-engine tuning 2 frequency too high."
 
                 accepted1, response = self.drc.send_command(f"drt{beam}", "drx", beam=beam, tuning=1,
                                                             central_freq=teng_f1, filter=f0, gain=gain1)
