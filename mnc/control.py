@@ -519,15 +519,15 @@ class Controller():
                 beam = int(recorder[3:])
 
                 # scale to freq in Hz and check
-                teng_f1n = int(teng_f1*(196e6/2**32))
-                teng_f2n = int(teng_f2*(196e6/2**32))
+                teng_f1n = teng_f1*(196e6/2**32)
+                teng_f2n = teng_f2*(196e6/2**32)
                 assert teng_f1n < 196e6/2 and teng_f2n < 196e6/2, "t-engine tuning frequency too high."
 
                 accepted1, response = self.drc.send_command(f"drt{beam}", "drx", beam=beam, tuning=1,
-                                                            central_freq=teng_f1, filter=f0, gain=gain1)
+                                                            central_freq=teng_f1n, filter=f0, gain=gain1)
                 if accepted1:
                     accepted2, response = self.drc.send_command(f"drt{beam}", "drx", beam=beam, tuning=2,
-                                                                central_freq=teng_f2, filter=f0, gain=gain2)
+                                                                central_freq=teng_f2n, filter=f0, gain=gain2)
 
                 if accepted1 and accepted2:
                     accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd, beam=beam,
