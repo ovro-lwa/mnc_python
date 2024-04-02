@@ -30,6 +30,15 @@ FPG_FILE = '/home/pipeline/proj/lwa-shell/caltech-lwa/snap2_f_200msps_64i_4096c/
 
 CORE_RADIUS_M = 200.0
 
+#: List of T-engine filter codes and their corresponding sample rates in Hz
+VOLT_FILTER_CODES = {1:   250000,
+                     2:   500000,
+                     3:  1000000,
+                     4:  2000000,
+                     5:  4900000,
+                     6:  9800000,
+                     7: 19600000}
+
 class Controller():
     """ Parse configuration and control all subsystems in uniform manner.
     Ideally, will also make it easy to monitor basic system status.
@@ -459,7 +468,7 @@ class Controller():
         self.pcontroller.stop_pipelines()
         time.sleep(20)
 
-    def start_dr(self, recorders=None, t0='now', duration=None, time_avg=1, teng_f1=None, teng_f2=None, f0=1, gain1=1, gain2=1):
+    def start_dr(self, recorders=None, t0='now', duration=None, time_avg=1, teng_f1=None, teng_f2=None, f0=7, gain1=6, gain2=6):
         """ Start data recorders listed recorders.
         Defaults to starting those listed in configuration file.
         Recorder list can be overloaded with 'drvs' (etc) or individual recorders (e.g., 'drvs7601').
@@ -468,7 +477,7 @@ class Controller():
         time_avg is power beam averaging time in milliseconds (integer converted to next lower power of 2).
         teng_f1/2 are the central frequencies of t-engine tunings in units of Hz.
         f0 sets bandwidth as integer from 1 (250kHz) to 7 (19.6MHz).
-        gain1/2 are gains on beamformers.
+        gain1/2 are t-engine re-quantization gains from 0 (most gain) to 15 (least gain).
         """
 
         dconf = self.conf['dr']
@@ -512,16 +521,17 @@ class Controller():
 
             elif recorder in [f'drt{n}' for n in range(1,3)]:
                 assert teng_f1 is not None and teng_f2 is not None, "Need to set teng_f1, teng_f2 frequencies"
-                assert (f0 > 0) and (f0 < 8), "f0 (filter number) should be from 1-7 (inclusive)"
+                assert f0 in VOLT_FILTER_CODES, "f0 (filter number) should be from 1-7 (inclusive)"
                 if duration is not None:
                     assert time_avg in [None, 0, 1], "No time averaging can be done for t-engine"
 
                 beam = int(recorder[3:])
 
-                # scale to freq in Hz and check
-                teng_f1n = int(teng_f1*(196e6/2**32))
-                teng_f2n = int(teng_f2*(196e6/2**32))
-                assert teng_f1n < 196e6/2 and teng_f2n < 196e6/2, "t-engine tuning frequency too high."
+                # Check for valid tunings
+                assert teng_f1 > VOLT_FILTER_CODES[f0]/2, "t-engine tuning 1 frequency too low."
+                assert teng_f2 > VOLT_FILTER_CODES[f0]/2, "t-engine tuning 2 frequency too low."
+                assert teng_f1 < (196e6/2-VOLT_FILTER_CODES[f0]/2), "t-engine tuning 1 frequency too high."
+                assert teng_f2 < (196e6/2-VOLT_FILTER_CODES[f0]/2), "t-engine tuning 2 frequency too high."
 
                 accepted1, response = self.drc.send_command(f"drt{beam}", "drx", beam=beam, tuning=1,
                                                             central_freq=teng_f1, filter=f0, gain=gain1)
