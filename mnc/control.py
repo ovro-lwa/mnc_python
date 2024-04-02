@@ -466,9 +466,9 @@ class Controller():
         t0 is either 'now' or a start time (astropy Time, mjd float, and isot strings supported).
         duration is length of data recording in milliseconds (required for power beam recording; optional for visibilities).
         time_avg is power beam averaging time in milliseconds (integer converted to next lower power of 2).
-        teng_f1/2 are the central frequencies of t-engine tunings in units of Hz.
+        teng_f1/2 are the central frequencies of t-engine tunings in units of "tuning words" (196 MHz/2**32).
         f0 sets bandwidth as integer from 1 (250kHz) to 7 (19.6MHz).
-        gain1/2 are gains on beamformers.
+        gain1/2 are t-engine re-quantization gains.
         """
 
         dconf = self.conf['dr']
