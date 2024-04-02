@@ -459,7 +459,7 @@ class Controller():
         self.pcontroller.stop_pipelines()
         time.sleep(20)
 
-    def start_dr(self, recorders=None, t0='now', duration=None, time_avg=1, teng_f1=None, teng_f2=None, f0=1, gain1=1, gain2=1):
+    def start_dr(self, recorders=None, t0='now', duration=None, time_avg=1, teng_f1=None, teng_f2=None, f0=7, gain1=6, gain2=6):
         """ Start data recorders listed recorders.
         Defaults to starting those listed in configuration file.
         Recorder list can be overloaded with 'drvs' (etc) or individual recorders (e.g., 'drvs7601').
