@@ -466,9 +466,9 @@ class Controller():
         t0 is either 'now' or a start time (astropy Time, mjd float, and isot strings supported).
         duration is length of data recording in milliseconds (required for power beam recording; optional for visibilities).
         time_avg is power beam averaging time in milliseconds (integer converted to next lower power of 2).
-        teng_f1/2 are the central frequencies of t-engine tunings in units of "tuning words" (196 MHz/2**32).
+        teng_f1/2 are the central frequencies of t-engine tunings in units of Hz.
         f0 sets bandwidth as integer from 1 (250kHz) to 7 (19.6MHz).
-        gain1/2 are t-engine re-quantization gains.
+        gain1/2 are t-engine re-quantization gains from 0 (most gain) to 15 (least gain).
         """
 
         dconf = self.conf['dr']
@@ -518,16 +518,14 @@ class Controller():
 
                 beam = int(recorder[3:])
 
-                # scale to freq in Hz and check
-                teng_f1n = teng_f1*(196e6/2**32)
-                teng_f2n = teng_f2*(196e6/2**32)
-                assert teng_f1n < 196e6/2 and teng_f2n < 196e6/2, "t-engine tuning frequency too high."
+                # Check for valid tunings
+                assert teng_f1 < 196e6/2 and teng_f2 < 196e6/2, "t-engine tuning frequency too high."
 
                 accepted1, response = self.drc.send_command(f"drt{beam}", "drx", beam=beam, tuning=1,
-                                                            central_freq=teng_f1n, filter=f0, gain=gain1)
+                                                            central_freq=teng_f1, filter=f0, gain=gain1)
                 if accepted1:
                     accepted2, response = self.drc.send_command(f"drt{beam}", "drx", beam=beam, tuning=2,
-                                                                central_freq=teng_f2n, filter=f0, gain=gain2)
+                                                                central_freq=teng_f2, filter=f0, gain=gain2)
 
                 if accepted1 and accepted2:
                     accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd, beam=beam,
