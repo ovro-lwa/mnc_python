@@ -22,8 +22,6 @@ from astropy.constants import c as speedOfLight
 speedOfLight = speedOfLight.to('m/ns').value
 
 
-
-
 from lwa_antpos.station import ovro
 
 from mnc.common import NPIPELINE, chan_to_freq, ETCD_HOST, get_logger
@@ -561,7 +559,7 @@ class BeamTracker(object):
 
 
 def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4,
-                         cal_directory='/home/ubuntu/mmanders/caltables/latest/', force=False,
+                         cal_directory='/home/pipeline/caltables/latest/', force=False,
                          etcdhost=ETCD_HOST, flag_ants: List[int]=[]):
     """
     Wraper to create a new BeamPointingControl instance and load bandpass
