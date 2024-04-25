@@ -191,9 +191,8 @@ class Controller():
 #                logger.info('All snaps already programmed.')
 
         if initialize or program:
-            is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
-            if len(is_programmed) != 11 or not all(is_programmed.values()) or force:
-                raise RuntimeError('Not all SNAPs programmed. Cannot initialize them.')
+            if len(is_programmed) != 11:
+                raise RuntimeError('Not all SNAPs responding.')
 
             resp = ec.send_command(0, 'controller', 'stop_poll_stats_loop')
 
