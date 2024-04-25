@@ -53,6 +53,18 @@ def start_xengine(full):
 
 
 @cli.command()
+@click.option('--program', is_flag=True, default=False, show_default=True)
+@click.option('--force', is_flag=True, default=False, show_default=True)
+def start_fengine(program, force):
+    """ Start f-engine with basic mnc-python interface
+    Option to program and force it to program.
+    """
+
+    con = control.Controller()
+    con.start_fengine(program=program, force=force)
+
+
+@cli.command()
 @click.option('--subsystem', default=None)
 def print_gonogo(subsystem):
     """ Check all subsystems and print the go/no-go status for each one.
