@@ -173,22 +173,22 @@ class Controller():
         ec = snap2_feng_etcd_client.Snap2FengineEtcdControl()
         is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
 
-        if program:
-            if (not all(is_programmed.values()) or force):
-                resp = ec.send_command(0, 'feng', 'program', timeout=120, n_response_expected=1, kwargs={'fpgfile': FPG_FILE})
-                if not resp:
-                    raise RuntimeError('Programming failed. Check f-engine etcd service logs as pipeline@calim.')
-                logger.info("Waiting 120 seconds (ignore error messages above)")
-                time.sleep(120)
-
-                is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
-                if not all(is_programmed.values()):
-                    raise RuntimeError('Programming of other snaps failed. Check f-engine service logs as pipeline@calim.')
-                else:
-                    logger.info("All snaps programmed")
-                resp = ec.send_command(0, 'controller', 'stop_poll_stats_loop')
-            else:
-                logger.info('All snaps already programmed.')
+#        if program:
+#            if (not all(is_programmed.values()) or force):
+#                resp = ec.send_command(0, 'feng', 'program', timeout=120, n_response_expected=1, kwargs={'fpgfile': FPG_FILE})
+#                if not resp:
+#                    raise RuntimeError('Programming failed. Check f-engine etcd service logs as pipeline@calim.')
+#                logger.info("Waiting 120 seconds (ignore error messages above)")
+#                time.sleep(120)
+#
+#                is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
+#                if not all(is_programmed.values()):
+#                    raise RuntimeError('Programming of other snaps failed. Check f-engine service logs as pipeline@calim.')
+#                else:
+#                    logger.info("All snaps programmed")
+#                resp = ec.send_command(0, 'controller', 'stop_poll_stats_loop')
+#            else:
+#                logger.info('All snaps already programmed.')
 
         if initialize or program:
             is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
