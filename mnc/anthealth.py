@@ -119,7 +119,8 @@ def get_badants(method, time=None, naming='ant'):
             dd = ls.get_dict(f'/mon/anthealth/{method}/{mjd0}')
         antstatus = dd['flagged']
         antnames = dd['antname']
-        mjd0 = dd['time']
+        if mjd0 is None:
+            mjd0 = float(dd['time'])
     elif method == 'union_and':
         # iterate over methods and take logical and per ant
         # antstatus = ...
