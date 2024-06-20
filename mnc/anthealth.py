@@ -107,7 +107,9 @@ def get_badants(method, time=None, naming='ant'):
     mjds = sorted([kv.key.decode().lstrip('/mon/anthealth/selfcorr/') for _, kv in et.get_prefix('/mon/anthealth/selfcorr')])
     mjds = list(filter(lambda x: x != '', mjds))  # remove blank entries
     if len(mjds) > 0:
-        mjd0 = list(filter(lambda x: float(x) < mjd, mjds))[-1]  # get the latest before mjd
+        mjds = list(filter(lambda x: float(x) <= mjd, mjds))
+        if len(mjds) > 0:
+            mjd0 = float(mjd0[-1])
     else:
         logger.error("No badant found with mjds. Using default.")
         mjd0 = None
