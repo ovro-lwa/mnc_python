@@ -61,6 +61,7 @@ def set_badants(method, badants, time=None, naming='ant'):
             # assume MJD if no "T" indicating ISOT format time
             mjd = time
 
+    assert Time(mjd, format='mjd'), f"Time ({time}) must be parsable into MJD."
     dd = {'time': mjd, 'flagged': antstatus, 'antname': antnames, 'naming': 'ant'}  # this could be expanded beyond booleans
     ls.put_dict(f'/mon/anthealth/{method}', dd)  # maybe influx can ingest from here
     ls.put_dict(f'/mon/anthealth/{method}/{mjd}', dd)
@@ -89,11 +90,18 @@ def get_badants(method, time=None, naming='ant'):
 
     # get times of past badant lists
     et = ls.get_etcd()
-    mjds = sorted([float(kv.key.decode().lstrip('/mon/anthealth/selfcorr/')) for _, kv in et.get_prefix('/mon/anthealth/selfcorr')])
-    mjd0 = filter(lambda x: x < mjd, mjds)[-1]  # get the latest before mjd
+    mjds = sorted([kv.key.decode().lstrip('/mon/anthealth/selfcorr/') for _, kv in et.get_prefix('/mon/anthealth/selfcorr')])
+    if len(mjds) > 0:
+        mjd0 = filter(lambda x: float(x) < mjd, mjds)[-1]  # get the latest before mjd
+    else:
+        logger.error("No badant found with mjds. Using default.")
+        mjd0 = None
 
     if 'union' not in method:
-        dd = ls.get_dict(f'/mon/anthealth/{method}/{mjd0}')
+        if mjd0 is None:
+            dd = ls.get_dict(f'/mon/anthealth/{method}')
+        else:
+            dd = ls.get_dict(f'/mon/anthealth/{method}/{mjd0}')
         antstatus = dd['flagged']
         antnames = dd['antname']
         mjd = dd['time']
