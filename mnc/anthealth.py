@@ -55,11 +55,18 @@ def set_badants(method, badants, time=None, naming='ant'):
     if time is None:
         mjd = Time.now().mjd
     else:
-        if 'T' in time:
-            mjd = Time(time, format='isot').mjd
-        else:
+        if isinstance(time, str):
+            if 'T' in time:
+                mjd = Time(time, format='isot').mjd
+            else:
+                logger.error(f"Time {time} not recognized.")
+                raise RuntimeError
+        elif isinstance(time, float) or isinstance(time, int):
             # assume MJD if no "T" indicating ISOT format time
             mjd = time
+        else:
+            logger.error(f"Time {time} not recognized.")
+            raise RuntimeError
 
     assert Time(mjd, format='mjd'), f"Time ({time}) must be parsable into MJD."
     dd = {'time': mjd, 'flagged': antstatus, 'antname': antnames, 'naming': 'ant'}  # this could be expanded beyond booleans
@@ -82,11 +89,18 @@ def get_badants(method, time=None, naming='ant'):
     if time is None:
         mjd = Time.now().mjd
     else:
-        if 'T' in time:
-            mjd = Time(time, format='isot').mjd
-        else:
+        if isinstance(time, str):
+            if 'T' in time:
+                mjd = Time(time, format='isot').mjd
+            else:
+                logger.error(f"Time {time} not recognized.")
+                raise RuntimeError
+        elif isinstance(time, float) or isinstance(time, int):
             # assume MJD if no "T" indicating ISOT format time
             mjd = time
+        else:
+            logger.error(f"Time {time} not recognized.")
+            raise RuntimeError
 
     # get times of past badant lists
     et = ls.get_etcd()
