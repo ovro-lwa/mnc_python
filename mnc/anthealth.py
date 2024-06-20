@@ -91,6 +91,7 @@ def get_badants(method, time=None, naming='ant'):
     # get times of past badant lists
     et = ls.get_etcd()
     mjds = sorted([kv.key.decode().lstrip('/mon/anthealth/selfcorr/') for _, kv in et.get_prefix('/mon/anthealth/selfcorr')])
+    mjds = filter(lambda x: x != '', mjds)  # remove blank entries
     if len(mjds) > 0:
         mjd0 = filter(lambda x: float(x) < mjd, mjds)[-1]  # get the latest before mjd
     else:
