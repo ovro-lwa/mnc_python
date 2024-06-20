@@ -119,7 +119,7 @@ def get_badants(method, time=None, naming='ant'):
             dd = ls.get_dict(f'/mon/anthealth/{method}/{mjd0}')
         antstatus = dd['flagged']
         antnames = dd['antname']
-        mjd = dd['time']
+        mjd0 = dd['time']
     elif method == 'union_and':
         # iterate over methods and take logical and per ant
         # antstatus = ...
@@ -145,7 +145,7 @@ def get_badants(method, time=None, naming='ant'):
     if -1 in badants:
         logger.warning("Correlator number could not be found for some antennas. Something's fishy...")
 
-    return mjd, badants
+    return mjd0, badants
 
 
 def caltable_flags(caltable):
