@@ -11,9 +11,10 @@ ls = dsa_store.DsaStore()
 METHODS = ['selfcorr', 'caltable', 'union_and', 'union_or']
 
 
-def set_badants(method, badants, naming='ant'):
+def set_badants(method, badants, time=None, naming='ant'):
     """ Set the antenna status for a given badant method.
     badants should be a list of antenna names as strings "001A" or "100". If no A/B pol, given then both pols assumed bad.
+    time refers to the date of the badant measurement (mjd or isot).
     naming defines antenna sequence and can be "antnum" (e.g., number in "LWA-001").
     """
 
@@ -51,14 +52,24 @@ def set_badants(method, badants, naming='ant'):
 
     antnames, antstatus = zip(*[(a.lstrip('LWA-')+pol, a.lstrip('LWA-')+pol in badants) for a in mapping.filter_df('used', True).index for pol in ['A', 'B']])  # make list of status for all ants in antnum order
     
-    mjd = Time.now().mjd
+    if time is None:
+        mjd = Time.now().mjd
+    else:
+        if 'T' in time:
+            mjd = Time(time, format='isot').mjd
+        else:
+            # assume MJD if no "T" indicating ISOT format time
+            mjd = time
+
     dd = {'time': mjd, 'flagged': antstatus, 'antname': antnames, 'naming': 'ant'}  # this could be expanded beyond booleans
-    ls.put_dict(f'/mon/anthealth/{method}', dd)
+    ls.put_dict(f'/mon/anthealth/{method}', dd)  # maybe influx can ingest from here
+    ls.put_dict(f'/mon/anthealth/{method}/{mjd}', dd)
 
 
-def get_badants(method, naming='ant'):
+def get_badants(method, time=None, naming='ant'):
     """ Given a badant method, return list of bad antennas
     naming defines antenna sequence and can be "ant" (e.g., number in "LWA-001") or "corr" (i.e., MS/CASA number).
+    mjd is the approximate day of the badant list. Defaults to the latest..
     Naming in etcd is in ant, but values can be set/get in either convention.
     """
 
@@ -67,8 +78,22 @@ def get_badants(method, naming='ant'):
     if method not in METHODS:
         logger.warning(f"Method {method} not fully supported. Select from: {METHODS}.")
 
+    if time is None:
+        mjd = Time.now().mjd
+    else:
+        if 'T' in time:
+            mjd = Time(time, format='isot').mjd
+        else:
+            # assume MJD if no "T" indicating ISOT format time
+            mjd = time
+
+    # get times of past badant lists
+    et = ls.get_etcd()
+    mjds = sorted([float(kv.key.decode().lstrip('/mon/anthealth/selfcorr/')) for _, kv in et.get_prefix('/mon/anthealth/selfcorr')])
+    mjd0 = filter(lambda x: x < mjd, mjds)[-1]  # get the latest before mjd
+
     if 'union' not in method:
-        dd = ls.get_dict(f'/mon/anthealth/{method}')
+        dd = ls.get_dict(f'/mon/anthealth/{method}/{mjd0}')
         antstatus = dd['flagged']
         antnames = dd['antname']
         mjd = dd['time']
