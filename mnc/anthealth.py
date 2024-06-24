@@ -104,7 +104,7 @@ def get_badants(method, time=None, naming='ant'):
 
     # get times of past badant lists
     et = ls.get_etcd()
-    mjds = sorted([kv.key.decode().lstrip('/mon/anthealth/selfcorr/') for _, kv in et.get_prefix('/mon/anthealth/selfcorr')])
+    mjds = sorted([kv.key.decode().lstrip(f'/mon/anthealth/{method}/') for _, kv in et.get_prefix(f'/mon/anthealth/{method}')])
     mjds = list(filter(lambda x: x != '', mjds))  # remove blank entries
     if len(mjds) > 0:
         mjds = list(filter(lambda x: float(x) <= mjd, mjds))
