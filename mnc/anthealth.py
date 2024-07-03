@@ -71,7 +71,7 @@ def set_badants(method, badants, time=None, naming='ant'):
     assert Time(mjd, format='mjd'), f"Time ({time}) must be parsable into MJD."
     dd = {'time': mjd, 'flagged': antstatus, 'antname': antnames, 'naming': 'ant'}  # this could be expanded beyond booleans
     ls.put_dict(f'/mon/anthealth/{method}', dd)  # maybe influx can ingest from here
-    ls.put_dict(f'/mon/anthealth/{method}/{mjd}', dd)
+    ls.put_dict(f'/mon/anthealth/{method}/{float(mjd)}', dd)
 
 
 def get_badants(method, time=None, naming='ant'):
@@ -118,9 +118,10 @@ def get_badants(method, time=None, naming='ant'):
 
     if 'union' not in method:
         if mjd0 is None:
+            logger.warn(f"No badant found for {method} at {mjd}. Using last list set.")
             dd = ls.get_dict(f'/mon/anthealth/{method}')
         else:
-            dd = ls.get_dict(f'/mon/anthealth/{method}/{mjd0}')
+            dd = ls.get_dict(f'/mon/anthealth/{method}/{float(mjd0)}')
         antstatus = dd['flagged']
         antnames = dd['antname']
         if mjd0 is None:
