@@ -11,14 +11,14 @@ ls = dsa_store.DsaStore()
 METHODS = ['selfcorr', 'caltable', 'union_and', 'union_or']
 
 
-def set_badants(method, badants, time=None, naming='ant'):
+def set_badants(method, badants, time=Time.now().mjd, naming='antname'):
     """ Set the antenna status for a given badant method.
-    badants should be a list of antenna names as strings "001A" or "100". If no A/B pol, given then both pols assumed bad.
+    badants should be a list of antenna names as strings "LWA-001A" or "100". If no A/B pol, given then both pols assumed bad.
     time refers to the date of the badant measurement (mjd or isot).
-    naming defines antenna sequence and can be "antnum" (e.g., number in "LWA-001").
+    naming defines antenna sequence and can be "antname" (e.g., "LWA-001").
     """
 
-    assert naming == 'ant', 'setting by ant naming only supported currently'
+    assert naming == 'antname', 'setting by ant naming only supported currently'
     assert isinstance(badants, list), "badants must be a list"
     assert isinstance(badants[0], str), "badant entries must be str"
     assert 'x' not in badants[0].lower() and 'y' not in badants[0].lower(), "define polarization with 'A' or 'B'"
@@ -42,46 +42,43 @@ def set_badants(method, badants, time=None, naming='ant'):
 
         if needspol:
             aa = int(badant)
-            badants2.append(f'{aa:03}A')
-            badants2.append(f'{aa:03}B')
+            badants2.append(f'LWA-{aa:03}A')
+            badants2.append(f'LWA-{aa:03}B')
         elif not needspol:
             aa = int(badant[:-1])
             pp = badant[-1]
-            badants2.append(f'{aa:03}{pp}')
+            badants2.append(f'LWA-{aa:03}{pp}')
     badants = badants2
 
-    antnames, antstatus = zip(*[(a.lstrip('LWA-')+pol, a.lstrip('LWA-')+pol in badants) for a in mapping.filter_df('used', True).index for pol in ['A', 'B']])  # make list of status for all ants in antnum order
+    antnames, antstatus = zip(*[(a+pol, a+pol in badants) for a in mapping.filter_df('used', True).index for pol in ['A', 'B']])  # make list of status for all ants in antnum order
     
-    if time is None:
-        mjd = Time.now().mjd
-    else:
-        if isinstance(time, str):
-            if 'T' in time:
-                mjd = Time(time, format='isot').mjd
-            else:
-                logger.error(f"Time {time} not recognized.")
-                raise RuntimeError
-        elif isinstance(time, float) or isinstance(time, int):
-            # assume MJD if no "T" indicating ISOT format time
-            mjd = time
+    if isinstance(time, str):
+        if 'T' in time:
+            mjd = Time(time, format='isot').mjd
         else:
             logger.error(f"Time {time} not recognized.")
             raise RuntimeError
+    elif isinstance(time, float) or isinstance(time, int):
+        # assume MJD if no "T" indicating ISOT format time
+        mjd = time
+    else:
+        logger.error(f"Time {time} not recognized.")
+        raise RuntimeError
 
     assert Time(mjd, format='mjd'), f"Time ({time}) must be parsable into MJD."
-    dd = {'time': mjd, 'flagged': antstatus, 'antname': antnames, 'naming': 'ant'}  # this could be expanded beyond booleans
+    dd = {'time': mjd, 'flagged': antstatus, 'antname': antnames, 'naming': 'antname'}  # this could be expanded beyond booleans
     ls.put_dict(f'/mon/anthealth/{method}', dd)  # maybe influx can ingest from here
     ls.put_dict(f'/mon/anthealth/{method}/{float(mjd)}', dd)
 
 
-def get_badants(method, time=None, naming='ant'):
+def get_badants(method, time=None, naming='antname'):
     """ Given a badant method, return list of bad antennas
-    naming defines antenna sequence and can be "ant" (e.g., number in "LWA-001") or "corr" (i.e., MS/CASA number).
+    naming defines antenna sequence and can be "antname" (e.g., "LWA-001") or "corr_num" (i.e., MS/CASA number).
     mjd is the approximate day of the badant list. Defaults to the latest..
     Naming in etcd is in ant, but values can be set/get in either convention.
     """
 
-    assert naming in ['ant', 'corr'], "naming must be 'ant' or 'corr'"
+    assert naming in ['antname', 'corr_num'], "naming must be 'antname' or 'corr_num'"
 
     if method not in METHODS:
         logger.warning(f"Method {method} not fully supported. Select from: {METHODS}.")
@@ -139,8 +136,8 @@ def get_badants(method, time=None, naming='ant'):
 
     badants = np.array(antnames)[np.where(antstatus)].tolist()
 
-    if naming is "corr":
-        logger.debug("mapping ant to corr naming")
+    if naming is "corr_num":
+        logger.debug("mapping antname to corr_num")
         badants2 = []
         for antname in badants:
             antnum = antname[:-1]
