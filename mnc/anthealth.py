@@ -41,13 +41,10 @@ def set_badants(method, badants, time=Time.now().mjd, naming='antname'):
             needspol = False
 
         if needspol:
-            aa = int(badant)
-            badants2.append(f'LWA-{aa:03}A')
-            badants2.append(f'LWA-{aa:03}B')
+            badants2.append(badant+"A")
+            badants2.append(badant+"B")
         elif not needspol:
-            aa = int(badant[:-1])
-            pp = badant[-1]
-            badants2.append(f'LWA-{aa:03}{pp}')
+            badants2.append(badant)
     badants = badants2
 
     antnames, antstatus = zip(*[(a+pol, a+pol in badants) for a in mapping.filter_df('used', True).index for pol in ['A', 'B']])  # make list of status for all ants in antnum order
@@ -140,9 +137,9 @@ def get_badants(method, time=None, naming='antname'):
         logger.debug("mapping antname to corr_num")
         badants2 = []
         for antname in badants:
-            antnum = antname[:-1]
-            pol = antname[-1]
-            badants2.append(str(mapping.antname_to_correlator(f'LWA-{antnum}'))+pol)
+            antname2 = antname[:-1]
+            antpol = antname[-1]
+            badants2.append(str(mapping.antname_to_correlator(f'{antname2}'))+antpol)
         badants = badants2
 
     if -1 in badants:
