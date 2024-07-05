@@ -70,7 +70,7 @@ def set_badants(method, badants, time=Time.now().mjd, naming='antname'):
 
 def get_badants(method, time=None, naming='antname'):
     """ Given a badant method, return list of bad antennas
-    naming defines antenna sequence and can be "antname" (e.g., "LWA-001") or "corr_num" (i.e., MS/CASA number).
+    naming defines antenna sequence and can be "antname" (e.g., "LWA-001A") or "corr_num" (i.e., MS/CASA number).
     mjd is the approximate day of the badant list. Defaults to the latest..
     Naming in etcd is in ant, but values can be set/get in either convention.
     """
