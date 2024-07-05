@@ -103,11 +103,10 @@ def get_badants(method, time=None, naming='antname'):
     if len(mjds) > 0:
         mjds = list(filter(lambda x: float(x) <= mjd, mjds))
         if len(mjds) > 0:
-            mjd0 = float(mjds[-1])
+            mjd0 = float(sorted(mjds)[-1])
         else:
             mjd0 = None
     else:
-        logger.error("No badant found with mjds. Using default.")
         mjd0 = None
 
     if 'union' not in method:
