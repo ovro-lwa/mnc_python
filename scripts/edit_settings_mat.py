@@ -2,15 +2,15 @@ import numpy as np
 import scipy.io as sio
 
 if __name__ == '__main__':
-    INPUT_MAT = '/home/pipeline/opsdata/20240315-settingsAll-day.mat'
-    OUTPUT_MAT = '20240315-settingsAll-day.mat'
+    INPUT_MAT = '/home/pipeline/opsdata/20240315-settingsAll-night.mat'
+    OUTPUT_MAT = '20240315-settingsAll-night.mat'
 
     config = sio.loadmat(INPUT_MAT, squeeze_me=True)
     
     #### Edit settings here ####
-    config['comment'] = 'This file turns off FEE power to both chan of LWA-041,044,120,124,209,235,255,280,310'
+    config['comment'] = 'This file turns off FEE power to both chan of LWA-041,044,120,124,235,280'
     new_off = np.array(
-        sorted([158, 159, 160, 161, 416, 417, 448, 449, 602, 603, 618, 619, 66, 67, 82, 83, 34, 35]),
+        sorted([158, 159, 160, 161, 416, 417, 448, 449, 618, 619, 82, 83]),
         dtype=config['off'].dtype)
     config['off'] = new_off
 
