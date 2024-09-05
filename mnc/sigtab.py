@@ -8,9 +8,9 @@
 # 20240228  Use opsdatapath.py to find sigtab.mat
 
 import scipy.io as mat
-import opsdatapath as dp
+# import opsdatapath as dp
 
-d = mat.loadmat(dp.OPSDATAPATH+'sigtab.mat')
+d = mat.loadmat('/home/pipeline/opsdata/' +'sigtab.mat')
 sigtab = d['sigtab']
 antNames = d['antNames']
 
