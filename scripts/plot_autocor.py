@@ -9,6 +9,8 @@ import matplotlib.colors
 import seaborn as sns
 from tqdm import tqdm
 from scipy import signal
+from astropy.time import Time
+from mnc import anthealth
 
 sns.set_theme()
 sns.set_context("poster")
@@ -307,6 +309,32 @@ def calc_stats(tt, freqs, antname, prefix, autocor, figdir, statdir, minfreq, ma
     sflag_yy[:, badspecshape_yy] ="BadSpecShape"
     bad2_yy = np.intersect1d(hightimevar_yy, badspecshape_yy)
     sflag_yy[:, bad2_yy] = "HighTimeVar+BadSpecShape"
+
+    # Update list of bad antennas
+    bad_ants_xx = np.concatenate((antname[lowflux_xx], antname[hightimevar_xx]))
+    bad_ants_xx = list(map(str, bad_ants_xx))
+    bad_ants_xx = [ant+'A' for ant in bad_ants_xx]
+
+    bad_ants_yy = np.concatenate((antname[lowflux_yy], antname[hightimevar_yy]))
+    bad_ants_yy = list(map(str, bad_ants_yy))
+    bad_ants_yy = [ant+'B' for ant in bad_ants_yy]
+
+    bad_ants = bad_ants_xx+bad_ants_yy
+    bad2 = [sub.replace('LWA', 'LWA-') for sub in bad_ants]
+    print(bad2)
+
+    yy = str(prefix[0][0:4])
+    mm = str(prefix[0][4:6])
+    dd = str(prefix[0][6:8])
+    h = str(prefix[0][9:11])
+    m = str(prefix[0][11:13])
+    s = str(prefix[0][13:15])
+    date =str(yy+'-'+mm+'-'+dd+'T'+h+':'+m+':'+s)
+    print('> setting badants for ',date)
+    mjd = Time(date, format='isot').mjd
+    print('> mjd = ', mjd)
+
+    anthealth.set_badants('selfcorr', bad2, time=mjd)
 
     # MAKE FIGURE
     minutes = (tt-tt[0])/60
