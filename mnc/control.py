@@ -362,14 +362,14 @@ class Controller():
         flag_ants = list({f"{mapping.antname_to_correlator('LWA-'+antname.rstrip('A').rstrip('B')):03}" for antname in flag_ants})
 
         if (callable(uvweight)):
-            assert uvweight.__code__.co_argcount == 1, "weight function must only take one argument"
-            self.bfc[num].set_beam_weighting(fnc=weight, flag_ants=flag_ants)
+            assert uvweight.__code__.co_argcount == 1, "uvweight function must only take one argument"
+            self.bfc[num].set_beam_weighting(fnc=uvweight, flag_ants=flag_ants)
         elif (uvweight == 'core'):
             self.bfc[num].set_beam_weighting(fnc=_core_weight_func, flag_ants=flag_ants)
         elif (uvweight == 'natural'):
             self.bfc[num].set_beam_weighting(flag_ants=flag_ants)
         else:
-            raise ValueError(f'Invalid value for weight {weight}')
+            raise ValueError(f'Invalid value for uvweight {uvweight}')
 
         if beam_gain:
             self.bfc[num].set_beam_gain(beam_gain, flag_ants=flag_ants)  # TODO: ensure flag_ants matches that used in weighting (single call?)
