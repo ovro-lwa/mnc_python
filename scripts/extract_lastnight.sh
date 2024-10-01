@@ -1,6 +1,6 @@
 #!/bin/bash
 
-workingdir="/lustre/ai/lastnight/"
+workingdir="/lustre/pipeline/lastnight/"
 
 mkdir -p $workingdir
 
