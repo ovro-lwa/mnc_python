@@ -20,6 +20,7 @@ def read_autocor(path: str):
     
     date = path[-9:-1]
     filenames = sorted(glob.glob(path+date+'*'))
+    print(f'Found filenames: {filenames}')
     prefix=[x[-19:-4] for x in filenames] 
     #print(prefix)
     
@@ -34,7 +35,7 @@ def read_autocor(path: str):
         tt[i] = np.array(data['time'])[0]
         antname = np.array(data['antname'])
         freq = np.array(data['freq'].real)
-        #print('> Reading number of channels in', f, freq.shape[0])
+        print('> Reading number of channels in', f, freq.shape[0])
         if (freq.shape[0]==3072):
             nch=3072
             good_freq=freq
