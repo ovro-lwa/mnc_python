@@ -11,10 +11,14 @@ from lwa_antpos import mapping
 from observing import obsstate
 
 DATAPATH = '/home/pipeline/opsdata'
+DAYONLY = True
 
 LIST_SETTINGS = sorted([(fn, os.path.basename(fn).split('-')[0]) for fn in glob.glob(DATAPATH + '/*settings*mat')], key=lambda x: x[1])
 if len(LIST_SETTINGS):
-    LATEST_SETTINGS = LIST_SETTINGS[-1][0]
+    if DAYONLY:
+        LATEST_SETTINGS = [l[0] for l in LIST_SETTINGS if 'day' in l[0]][-1]
+    else:
+        LATEST_SETTINGS = LIST_SETTINGS[-1][0]
 else:
     LATEST_SETTINGS = None
 
