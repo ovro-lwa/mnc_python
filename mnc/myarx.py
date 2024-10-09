@@ -20,7 +20,7 @@ import warnings
 
 arx = lwautils.lwa_arx.ARX()
 
-import opsdatapath
+from mnc import opsdatapath
 RFPOWEROFFSETLOG = opsdatapath.OPSDATAPATH + 'arxPowerOffsets.log'
 
 def raw(adr,cmd):
@@ -150,7 +150,7 @@ def feeOff(adr,chan=0):  # Turn off all front ends of an ARX board, or just one 
     if chan:
         chi = '%1X'%(chan-1)
         c = raw2int(adr,'GETC'+chi)[0] & 0x7FFF
-        arx.raw(adr,'SETC'+chi+'%4X'%c)
+        arx.raw(adr,'SETC'+chi+'%04X'%c)
     else:
         c = np.array(raw2int(adr,'GETA')) & 0x7FFF
         for i in range(len(c)):

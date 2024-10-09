@@ -152,54 +152,54 @@ xengines:
   update_interval: 15  # beamformer tracking update cadence in seconds
   # Which antennas to output in the fast dump stream
   fast_vis_ants:
+    - LWA-350
+    - LWA-284
+    - LWA-316
+    - LWA-364
+    - LWA-297
+    - LWA-256
+    - LWA-268
+    - LWA-332
+    - LWA-362
+    - LWA-300
+    - LWA-363
+    - LWA-299
+    - LWA-273
+    - LWA-361
+    - LWA-360
+    - LWA-279
+    - LWA-340
+    - LWA-302
+    - LWA-277
+    - LWA-298
+    - LWA-329
+    - LWA-317
+    - LWA-356
+    - LWA-333
+    - LWA-349
+    - LWA-354
+    - LWA-253
+    - LWA-290
+    - LWA-328
+    - LWA-278
+    - LWA-318
+    - LWA-342
+    - LWA-355
+    - LWA-286
+    - LWA-341
+    - LWA-264
+    - LWA-313
+    - LWA-351
+    - LWA-289
+    - LWA-319
+    - LWA-347
     - LWA-042
     - LWA-087
-    - LWA-114
     - LWA-188
     - LWA-229
-    - LWA-253
-    - LWA-256
-    - LWA-263
-    - LWA-268
-    - LWA-277
-    - LWA-279
-    - LWA-280
-    - LWA-284
-    - LWA-286
-    - LWA-289
-    - LWA-290
-    - LWA-297
-    - LWA-298
-    - LWA-299
-    - LWA-300
-    - LWA-302
-    - LWA-303
-    - LWA-310
-    - LWA-313
-    - LWA-316
-    - LWA-318
-    - LWA-319
-    - LWA-325
-    - LWA-328
-    - LWA-332
-    - LWA-333
-    - LWA-340
-    - LWA-341
-    - LWA-342
-    - LWA-347
-    - LWA-349
-    - LWA-350
-    - LWA-351
-    - LWA-352
-    - LWA-353
-    - LWA-354
-    - LWA-355
-    - LWA-360
-    - LWA-361
-    - LWA-362
-    - LWA-363
-    - LWA-364
-    - LWA-365
+    - LWA-114
+    - LWA-117
+    - LWA-147
 
 # IP address of each data recorder server (used by x-eng control)
 drip_mapping:
