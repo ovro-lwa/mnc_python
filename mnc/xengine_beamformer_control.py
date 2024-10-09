@@ -299,8 +299,10 @@ class BeamPointingControl(object):
             for j in range(NPOL):
                 pos=numpy.where(flgdata[:,i,j])[0] 
                 num_flagged_ant=len(numpy.union1d(pos,flagged_ant))  
-                gain_antcount = (len(self.station.antennas)-num_flagged_ant)  
-                norm_factors[i,j]=gain_antcount  
+                gain_antcount = (len(self.station.antennas)-num_flagged_ant) 
+                if gain_antcount!=0:
+                    norm_factors[i,j]=gain_antcount  ### if gain_antcount is 0, that is all antennas are flagged for a channel,pol pair, 
+                                                    ### then normalisation is not needed as anyway that channel will be flagged in the data
             
         # Set the coefficients - this is slow
         async def push_gains(pp, ii, beam_id, input_id, g):
