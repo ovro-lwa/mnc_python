@@ -16,18 +16,6 @@
 #  - if min:sec are not provided (e.g., time=HH), the script will extract all the observations taken on the
 #    specified day and hr
 
-# ------------------------------------------------------------
-# How to activate the python environment
-# ------------------------------------------------------------
-#cd /opt/devel/ai/distributed-pipeline
-#conda activate py38_orca
-#pipenv shell
-#conda activate py38_orca
-#pipenv sync
-
-# To run the script on multiple node
-# cp /home/ai/antenna_status/extract_antenna_spectra_v0.py /opt/devel/ai/distributed-pipeline/orca/extra/
-# pdsh -w lwacalim[01-08] 'conda activate py38_orca && cd /opt/devel/ai/distributed-pipeline/ && pipenv run python orca/extra/extract_antenna_spectra_v0.py 20230804_070005'
 
 import argparse
 import glob
@@ -89,26 +77,27 @@ def extract_selfcorr(path: str, date: str, time: str, step: int, workingdir: str
     
     workdir = workingdir+date+'/'
     os.makedirs(workdir, exist_ok=True)
-    print(f'> Extracting autocorrelations for {date}')
+   
     
     # we work hour by hour
     for k in np.arange(len(p_hh[0])): # iterate on the hour
         #print('k=',k)
-        #print('p_hh[0].shape=',p_hh[0].shape)
+        #print('p_hh[0][k]=',p_hh[0][k])
+        print(f'> Extracting autocorrelations for {date}, {p_hh[0][k][-2:]} UT')
         # Find the timestamp of the files
         timestamps=np.array(())
         if len(time)==6:
             timestamps = time
         elif len(time)==0:
-            #print('p_hh[0][k]::',p_hh[0][k])
-            timestamps = glob.glob(p_hh[0][k]+'/*')
+            #print('p_hh[3][k]::',p_hh[3][k])
+            timestamps = glob.glob(p_hh[3][k]+'/*')
             #print(timestamps)
             timestamps = sorted([row[-24:-9] for row in timestamps])
             timestamps = timestamps[0::step]
             #timestamps=sorted(timestamps)
             #print('timestamps:',timestamps)
         else:
-            s_time = p_hh[0][0]+'/'+date+'_'+time+'*'
+            s_time = p_hh[3][0]+'/'+date+'_'+time+'*'
             #print(s_time)
             timestamps = glob.glob(s_time)
             timestamps = sorted([row[-24:-9] for row in timestamps])
@@ -116,6 +105,9 @@ def extract_selfcorr(path: str, date: str, time: str, step: int, workingdir: str
             #print('timestamps:',timestamps)        
 
         # We now work on each timestamp
+        if (len(timestamps)==0):
+            print("> no files found")
+        
         for i, timestamp in enumerate(timestamps):        
         
             # Extract autocorrelation for each band
@@ -127,7 +119,7 @@ def extract_selfcorr(path: str, date: str, time: str, step: int, workingdir: str
 
                 if (os.path.exists(ms)):
                     
-                    #print("> Working on ",ms)
+                    #printx("> Working on ",ms)
                     
                     # get frequency information
                     with table(ms+'/SPECTRAL_WINDOW', readonly=True, ack=False) as tb:
@@ -166,7 +158,7 @@ def extract_selfcorr(path: str, date: str, time: str, step: int, workingdir: str
                     np.savez_compressed(workdir+timestamp+".npz",  antname=antname, time=comb_time, freq=comb_freq.flatten(), autocor=comb_autocor)
 
                 else:
-                    print(f"> WARNING: file {ms} does not exist") 
+                    print(f"> WARNING: file {ms} does not exist. Continuing anyway.") 
                
                  
 if __name__=='__main__':
