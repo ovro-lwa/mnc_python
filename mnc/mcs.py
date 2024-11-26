@@ -311,7 +311,7 @@ class MonitorPointCallbackBase(object):
         
     def __call__(self, event):
         output = None
-        for evt in event.events:
+        for evt in getattr(event, 'events', []):
             value = MonitorPoint.from_json(evt.value)
             output = self.action(value)
         return output
@@ -345,7 +345,7 @@ class CommandCallbackBase(object):
         return status, response
         
     def __call__(self, event):
-        for evt in event.events:
+        for evt in getattr(event, 'events', []):
             try:
                 key = evt.key.decode()
             except AttributeError:
