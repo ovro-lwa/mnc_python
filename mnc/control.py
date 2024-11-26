@@ -505,6 +505,10 @@ class Controller():
         # start ms writing
         logger.info(f"Starting recorders {recorders} at {start.mjd} (currently {Time.now().mjd})")
         for recorder in recorders:
+            # treat encoded recorder name "drt1raw" interpreted as "drt1" with a "raw_record" command.
+            record_command = "raw_record" if "raw" in recorder else "record"
+            recorder = recorder.rstrip("raw")
+
             accepted = False
 
             # power beams
@@ -539,7 +543,7 @@ class Controller():
                                                                 central_freq=teng_f2, filter=f0, gain=gain2)
 
                 if accepted1 and accepted2:
-                    accepted, response = self.drc.send_command(recorder, 'record', start_mjd=mjd, beam=beam,
+                    accepted, response = self.drc.send_command(recorder, record_command, start_mjd=mjd, beam=beam,
                                                                start_mpm=mpm, duration_ms=duration)
                 else:
                     logger.warn("tengine tuning command(s) not successful. Not starting data recorder.")
