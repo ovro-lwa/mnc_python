@@ -241,14 +241,14 @@ class ImageMonitorPoint(MonitorPoint):
         
         try:
             ts = os.path.getmtime(name_or_handle.name)
-            ext = os.path.getext(name_or_handle.name)[1]
+            ext = os.path.splitext(name_or_handle.name)[1]
             if ext not in ('.png', '.jpg', '.jpeg'):
                 raise RuntimeError("Provided file does not seem to be a support image format")
                 
             image_data = name_or_handle.read()
         except AttributeError:
             ts = os.path.getmtime(name_or_handle)
-            ext = os.path.getext(name_or_handle)[1]
+            ext = os.path.splitext(name_or_handle)[1]
             if ext not in ('.png', '.jpg', '.jpeg'):
                 raise RuntimeError("Provided file does not seem to be a support image format")
                 
@@ -404,11 +404,7 @@ class Client(object):
                 self.client.cancel_watch(self._watchers[command][0])
             except Exception:
                 pass
-        try:
-            self.client.close()
-        except Exception:
-            pass
-            
+                
     def remove_monitor_point(self, name):
         """
         Remove the specified monitoring point.  Returns True if the deletion was
@@ -670,10 +666,14 @@ class Client(object):
         def _timeout(signum, frame):
             raise RuntimeError("timeout")
         signal.signal(signal.SIGALRM, _timeout)
+        
+        cancel = None
+        result = (False, s_id)
 
         try:
             if self.timeout > 0:
                 signal.alarm(int(round(self.timeout)))
+                
             events_iterator, cancel = self.client.watch(resp_name)
             
             self.client.put(full_name, payload)
@@ -686,10 +686,19 @@ class Client(object):
                     if value['sequence_id'] == sequence_id:
                         found = value
                         break
-            cancel()
-            signal.alarm(0)
+                        
+            result = (True, found)
             
-            return True, found
         except Exception as e:
             warnings.warn("Error sending command to '/cmd/%s/%s': %s" % (subsystem, command, str(e)), RuntimeWarning)
-            return False, s_id
+            
+        finally:
+            signal.alarm(0)
+            
+            if cancel is not None:
+                try:
+                    cancel()
+                except Exception as e:
+                    pass
+                    
+        return result
