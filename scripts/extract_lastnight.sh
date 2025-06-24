@@ -23,5 +23,5 @@ old=$(date --date='last week' '+%Y%m%d')
 olddir=$workingdir$old"/"
 rm -rf $olddir
 
-scp /tmp/lastnight/$last/fig/${last}_antenna_status_*.png lwacalim10:/data10/pipeline/anthealth/
-scp /tmp/lastnight/$last/stats/${last}.txt lwacalim10:/data10/pipeline/anthealth/
+scp /lustre/pipeline/lastnight/$last/fig/${last}_antenna_status_*.png lwacalim10:/data10/pipeline/anthealth/
+scp /lustre/pipeline/lastnight/$last/stats/${last}.txt lwacalim10:/data10/pipeline/anthealth/
