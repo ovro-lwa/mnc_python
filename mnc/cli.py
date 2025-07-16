@@ -44,24 +44,29 @@ def load_settings(filename):
 
 @cli.command()
 @click.option('--full', is_flag=True, default=False, show_default=True)
-def start_xengine(full):
+@click.option('--force', is_flag=True, default=False, show_default=True)
+@click.option('--xhosts', default=None, type=str, help="Comma-delimited string with xhost server names (e.g., 'lxdlwagpu01,lxdlwagpu02')")
+def start_xengine(full, force, xhosts):
     """ Turn on x-engine with basic mnc-python interface
     """
 
-    con = control.Controller()
-    con.configure_xengine(full=full)
+    if xhosts is not None:
+        xhosts = xhosts.split(',')
+
+    con = control.Controller(xhosts=xhosts)
+    con.configure_xengine(full=full, force=force)
 
 
 @cli.command()
 @click.option('--program', is_flag=True, default=False, show_default=True)
-@click.option('--force', is_flag=True, default=False, show_default=True)
-def start_fengine(program, force):
+@click.option('--initialize', is_flag=True, default=False, show_default=True)
+def start_fengine(program, initialize):
     """ Start f-engine with basic mnc-python interface
     Option to program and force it to program.
     """
 
     con = control.Controller()
-    con.start_fengine(program=program, force=force)
+    con.start_fengine(program=program, initialize=initialize)
 
 
 @cli.command()
