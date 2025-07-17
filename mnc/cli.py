@@ -5,6 +5,10 @@ from mnc.fengmon import get_ant_autocorr
 from lwa_antpos import mapping
 import matplotlib.pyplot as plt
 import numpy as np
+import warnings
+
+warnings.filterwarnings('ignore', module='astropy._erfa')
+
 
 @click.group('lwamnc')
 def cli():
