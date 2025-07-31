@@ -16,7 +16,7 @@ do
 done
 
 workingdir=$workingdir$last"/"
-python3 plot_autocor.py -p $workingdir
+python3 plot_autocor.py -ds -p $workingdir
 
 # clean up old data
 old=$(date --date='last week' '+%Y%m%d')
