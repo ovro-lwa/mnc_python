@@ -682,9 +682,9 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='Plot self-correlations')
     parser.add_argument('-p', '--path', type=str, required=True, help='Absolute path to the directory containing the autocorrelations')
-    parser.add_argument('-ds', '--dynSpec', type=bool, required=False, default=False, help='Plot dynamic spectra')
-    parser.add_argument('-ft', '--fluxvstime', type=bool, required=False, default=False, help='Plot flux vs time')
-    parser.add_argument('-ns', '--normSpec', type=bool, required=False, default=False, help='Plot normalized spectra')
+    parser.add_argument('-ds', '--dynSpec', type=bool, is_flag=True, required=False, default=False, help='Plot dynamic spectra')
+    parser.add_argument('-ft', '--fluxvstime', type=bool, is_flag=True, required=False, default=False, help='Plot flux vs time')
+    parser.add_argument('-ns', '--normSpec', type=bool, is_flag=True, required=False, default=False, help='Plot normalized spectra')
     
     args = parser.parse_args()
     
