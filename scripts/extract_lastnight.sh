@@ -1,7 +1,7 @@
 #!/bin/bash
 
 workingdir="/lustre/pipeline/lastnight/"
-
+scriptdir="/home/pipeline/proj/lwa-shell/mnc_python/scripts/"
 mkdir -p $workingdir
 
 #msdate="20240127"
@@ -12,7 +12,7 @@ msdate=$last
 hrs=(06 07 08 09 10 11 12)
 for hr in ${hrs[@]}
 do 
-    python3 extract_autocor.py -p /lustre/pipeline/slow/ -d 30 -d $msdate -t $hr -w $workingdir
+    python3 $scriptdir/extract_autocor.py -p /lustre/pipeline/slow/ -d 30 -d $msdate -t $hr -w $workingdir
 done
 
 workingdir=$workingdir$last"/"
