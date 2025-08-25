@@ -1,175 +1,222 @@
+#!/usr/bin/env python3
 #
-# This will extract self-correlation spectra for all the antennas for a specified day/hr/min/sec.
-# All 16 subbands are used to make the spectra. The spectra will be saved in npy array for
-# further processing
+# This script extracts self-correlation spectra for all antennas for a
+# specified day/hr/min/sec. It combines all 16 subbands to create the
+# spectra and saves them as compressed NumPy '.npz' arrays for further processing.
 #
-# The script takes three parameters:
-# 1. the full path to the parent directory containing the data, e.g., /lustre/pipeline/night-time/
-#    or /lustre/pipeline/slow
-# 2. the date of the observations in the format YYYYMMDD, e.g, day=20231214
-# 3. the hr:min:sec of the observations in the format HHMMSS, e.g, time=024002
+# This version is OPTIMIZED FOR PARALLEL EXECUTION.
 #
-# NOTES:
-#  - If time="" is not provided, the script will extract all the observations taken on the specified day
-#  - If sec is not provided (e.g., time=HHMM), the script will extract all the observations taken in the
-#    specified day, hr, and minute
-#  - if min:sec are not provided (e.g., time=HH), the script will extract all the observations taken on the
-#    specified day and hr
-
 
 import argparse
-import glob
-import shutil
-import logging, sys
+import logging
+import sys
 import os
-
-from tqdm import tqdm
+from collections import defaultdict
+from pathlib import Path
+from typing import Dict, List, Optional
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from functools import partial
 
 import numpy as np
-
 from casacore.tables import table
-#from casatasks import mstransform
-#logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s',
-#                    datefmt='%Y-%m-%d %H:%M:%S', handlers=[logging.StreamHandler(sys.stdout)])
-#logger = logging.getLogger(__name__)
+from tqdm import tqdm
+
+# --- Setup ---
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
 
+# --- Core Functions (largely unchanged) ---
 
-# function that extract self-correlations from ms file
-def extract_selfcorr(path: str, date: str, time: str, step: int, workingdir: str):
+def _get_autocorr_indices(num_antennas: int) -> np.ndarray:
+    """
+    Calculate the indices of the autocorrelation data in a flattened visibility array.
+    """
+    steps = np.arange(num_antennas, 1, -1)
+    return np.cumsum(np.insert(steps, 0, 0))
 
-    #print(path)
-    #print(date)
-    #print(time)
-    #print(step)
+
+def read_ms_data(ms_path: Path) -> Optional[Dict[str, np.ndarray]]:
+    """
+    Extracts frequency, time, antenna names, and autocorrelation data from a single MS file.
+    """
+    if not ms_path.is_dir():
+        logging.warning(f"Measurement Set not found or is not a directory: {ms_path}")
+        return None
+    try:
+        with table(str(ms_path / 'SPECTRAL_WINDOW'), readonly=True, ack=False) as tb:
+            freq = tb.getcol('CHAN_FREQ')
+        with table(str(ms_path / 'ANTENNA'), readonly=True, ack=False) as tb:
+            antname = tb.getcol('NAME')
+            num_antennas = len(antname)
+        with table(str(ms_path), readonly=True, ack=False) as tb:
+            data = tb.getcol('DATA')
+            time_val = tb.getcol('TIME')
+        indices = _get_autocorr_indices(num_antennas)
+        autocor = data[indices, :, :]
+        return {"freq": freq, "time": time_val, "autocor": autocor, "antname": antname}
+    except Exception as e:
+        logging.error(f"Failed to read data from {ms_path}: {e}")
+        return None
+
+
+def process_timestamp(timestamp: str, ms_files_dict: Dict[str, List[Path]], output_dir: Path):
+    """
+    Processes all sub-bands for a single timestamp, combines them, and saves the result.
     
-    # Find the available bands and prepare the path
-    p_band = sorted(glob.glob(path+'*'))
-    s_band = [p[-5:] for p in p_band]
-    #print(s_band)
+    Note: This function is now designed to be called by a parallel worker.
+    """
+    ms_files = ms_files_dict[timestamp]
+    # The logging inside this function will appear from the worker processes.
+    logging.info(f"Processing {len(ms_files)} sub-bands for timestamp: {timestamp}")
+
+    freq_list, time_list, autocor_list = [], [], []
+    antname = None
+
+    for ms_path in sorted(ms_files):
+        data = read_ms_data(ms_path)
+        if data:
+            freq_list.append(data["freq"])
+            time_list.append(data["time"])
+            autocor_list.append(data["autocor"])
+            if antname is None:
+                antname = data["antname"]
+
+    if not autocor_list:
+        logging.warning(f"No valid data found for timestamp {timestamp}. Skipping.")
+        return
+
+    combined_freq = np.concatenate(freq_list, axis=0).flatten()
+    combined_time = np.concatenate(time_list, axis=0)
+    combined_autocor = np.concatenate(autocor_list, axis=1)
+
+    output_filename = output_dir / f"{timestamp}.npz"
+    np.savez_compressed(
+        output_filename,
+        antname=antname,
+        time=combined_time,
+        freq=combined_freq,
+        autocor=combined_autocor
+    )
+    # Return the path to indicate completion, useful for the progress bar.
+    return output_filename
+
+
+def find_and_group_ms_files(base_path: Path, date: str, time_filter: str) -> Dict[str, List[Path]]:
+    """
+    Finds all MS files matching the date and time criteria and groups them by timestamp.
+    """
+    date_path_str = f"{date[0:4]}-{date[4:6]}-{date[6:8]}"
+    time_glob_pattern = time_filter + '*'
+
+    #search_pattern = f"*/{date_path_str}/*/{date}_{time_glob_pattern}*.ms"
+    search_pattern = f"*/{date_path_str}/*/{date}_{time_glob_pattern}.ms"
     
-    # Add date to the path
-    s_date = '/'+date[0:4]+'-'+date[4:6]+'-'+date[6:8]
-    p_date = [p +s_date for p in p_band]
-    #print(p_date)
+    logging.info(f"Searching for MS files in '{base_path}' with pattern: '{search_pattern}'")
+
+    files_by_timestamp = defaultdict(list)
+    ms_paths = list(base_path.glob(search_pattern))
+
+    if not ms_paths:
+        logging.warning("No Measurement Set files found for the specified criteria.")
+        return {}
+
+    logging.info(f"Found {len(ms_paths)} total MS files. Grouping by timestamp...")
+
+    for path in ms_paths:
+        try:
+            parts = path.name.split('_')
+            timestamp = f"{parts[0]}_{parts[1]}"
+            files_by_timestamp[timestamp].append(path)
+        except IndexError:
+            logging.warning(f"Could not parse timestamp from filename: {path.name}")
+            continue
+            
+    return files_by_timestamp
+
+
+def extract_autocorrelations(path: str, date: str, time: str, step: int, workingdir: str, workers: int):
+    """
+    Main function to find, process, and save self-correlation spectra in parallel.
+    """
+    base_data_path = Path(path)
+    output_dir = Path(workingdir) / date
+    output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Add hour to the path
-    hh = time[0:2]   
-    if (hh):
-        s_hh = hh
-        p_hh = np.array([p+'/'+s_hh for p in p_date])
-        p_hh = np.expand_dims(p_hh, 1)
-    else:
-        p_hh = np.array([sorted(glob.glob(p+'/*')) for p in p_date])
-        p_hh = np.squeeze(p_hh)
-        #p_hh = np.expand_dims(p_hh, 1)
-        s_hh = [p[-2:] for p in p_hh[0]]
+    files_by_timestamp = find_and_group_ms_files(base_data_path, date, time)
+    
+    if not files_by_timestamp:
+        return
+
+    sorted_timestamps = sorted(files_by_timestamp.keys())
+    timestamps_to_process = sorted_timestamps[::step]
+    
+    num_jobs = len(timestamps_to_process)
+    logging.info(f"Found {len(sorted_timestamps)} unique timestamps. "
+                 f"Will process {num_jobs} in parallel using {workers} workers.")
+    
+    # *** NEW: PARALLEL EXECUTION BLOCK ***
+    # Use 'partial' to create a function that only needs the 'timestamp' argument
+    task_function = partial(process_timestamp, ms_files_dict=files_by_timestamp, output_dir=output_dir)
+    
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        # Submit all jobs to the executor
+        futures = {executor.submit(task_function, ts): ts for ts in timestamps_to_process}
         
-        
-    #print('p_hh::',p_hh)
-    #print(p_hh.shape)
-    #print('p_hh[0]::',p_hh[0])
-    #print(p_hh[0].shape)
-    #print('s_hh::',s_hh)
+        # Use tqdm to create a progress bar as jobs are completed
+        for future in tqdm(as_completed(futures), total=num_jobs, desc="Processing Timestamps"):
+            try:
+                result = future.result()
+                # You could add logging here, e.g., logging.info(f"Successfully wrote {result}")
+            except Exception as exc:
+                timestamp = futures[future]
+                logging.error(f"Timestamp {timestamp} generated an exception: {exc}")
 
-    # ------------------------------
-    # Extract autocorrlations
-    
-    workdir = workingdir+date+'/'
-    os.makedirs(workdir, exist_ok=True)
-   
-    
-    # we work hour by hour
-    for k in np.arange(len(p_hh[0])): # iterate on the hour
-        #print('k=',k)
-        #print('p_hh[0][k]=',p_hh[0][k])
-        print(f'> Extracting autocorrelations for {date}, {p_hh[0][k][-2:]} UT')
-        # Find the timestamp of the files
-        timestamps=np.array(())
-        if len(time)==6:
-            timestamps = time
-        elif len(time)==0:
-            #print('p_hh[3][k]::',p_hh[3][k])
-            timestamps = glob.glob(p_hh[3][k]+'/*')
-            #print(timestamps)
-            timestamps = sorted([row[-24:-9] for row in timestamps])
-            timestamps = timestamps[0::step]
-            #timestamps=sorted(timestamps)
-            #print('timestamps:',timestamps)
-        else:
-            s_time = p_hh[3][0]+'/'+date+'_'+time+'*'
-            #print(s_time)
-            timestamps = glob.glob(s_time)
-            timestamps = sorted([row[-24:-9] for row in timestamps])
-            timestamps = timestamps[0::step]
-            #print('timestamps:',timestamps)        
 
-        # We now work on each timestamp
-        if (len(timestamps)==0):
-            print("> no files found")
-        
-        for i, timestamp in enumerate(timestamps):        
-        
-            # Extract autocorrelation for each band
-            for j, band in enumerate(s_band):
-
-                #print(p_hh[j][k])
-                #print(timestamp)
-                ms = p_hh[j][k]+'/'+timestamp+'_'+band+'.ms'
-
-                if (os.path.exists(ms)):
-                    
-                    #printx("> Working on ",ms)
-                    
-                    # get frequency information
-                    with table(ms+'/SPECTRAL_WINDOW', readonly=True, ack=False) as tb:
-                        freq = tb.getcol('CHAN_FREQ')
-
-                    # get antenna names
-                    with table(ms+'/ANTENNA', readonly=True, ack=False) as tb:
-                        antname = tb.getcol('NAME')
-                        nant = len(antname)
-                
-                    with table(ms, readonly=True, ack=False) as tb:
-                        data = tb.getcol('DATA')
-                        #print(data.shape)
-                        #ant1 = np.squeeze(tb.getcol('ANTENNA1'))
-                        #ant2 = np.squeeze(tb.getcol('ANTENNA2'))
-                        time2 = tb.getcol('TIME')
-                
-                    # Extract autocorrelations. To do that I define an array with the
-                    # indexes of the diagonal elements which corresponds to autocorrelations 
-                    ind = np.zeros((nant), dtype=int)
-                    for n in range(1,nant):
-                        ind[n] = int(ind[n-1]+nant+1-n)
-                        autocor = data[ind][:][:]
-
-                    if j==0:
-                       comb_freq = freq
-                       comb_time = time2
-                       comb_autocor = autocor
-                    else:
-                       comb_freq = np.concatenate((comb_freq, freq), axis=0)
-                       comb_time = np.concatenate((comb_time, time2), axis=0)
-                       comb_autocor = np.concatenate((comb_autocor, autocor), axis=1)
-
-                    
-                    #print("> Writing autocorrelations in ", workdir+timestamp+".npz")
-                    np.savez_compressed(workdir+timestamp+".npz",  antname=antname, time=comb_time, freq=comb_freq.flatten(), autocor=comb_autocor)
-
-                else:
-                    print(f"> WARNING: file {ms} does not exist. Continuing anyway.") 
-               
-                 
-if __name__=='__main__':
-    parser = argparse.ArgumentParser(description='Extract self-correlations')
-    parser.add_argument('-p', '--path', type=str, required=True, help='Absolute path to the parent directory containing the ms files')
-    parser.add_argument('-d', '--date', type=str, required=True, help='Date of the observations in the format YYYY-MM-DD')
-    parser.add_argument('-t', '--time', type=str, required=False, default='', help='Time of the observations in HHMMSS, or HHMM, or HH. Default=none')
-    parser.add_argument('-s', '--step', type=int, required=False, default=60, help='Number of files to use (e.g., step=1 means every file in the specified time range is used, step=6 means that 1 every 6 files is used. step=6 means that autocorrlations are extracted once every minute. Step=360 means that autocorrelations are extracted once every hour. Default=60 (extract autocorrelation every 10 minutes)')
-    parser.add_argument('-w', '--workingdir', type=str, required=False, default='/lustre/ai/', help='Path to save the autocorrelation files')
+def main():
+    """Argument parsing and script execution."""
+    parser = argparse.ArgumentParser(
+        description='Extract self-correlation spectra from Measurement Set (MS) files in parallel.',
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    # ... (all other arguments are the same)
+    parser.add_argument(
+        '-p', '--path', type=str, required=True,
+        help='Absolute path to the parent directory containing the data (e.g., /lustre/pipeline/).'
+    )
+    parser.add_argument(
+        '-d', '--date', type=str, required=True,
+        help='Date of the observations in YYYYMMDD format (e.g., 20231214).'
+    )
+    parser.add_argument(
+        '-t', '--time', type=str, required=False, default='',
+        help='Time of observations. Can be HHMMSS, HHMM, or HH. \nIf not provided, all observations for the specified day will be processed.'
+    )
+    parser.add_argument(
+        '-s', '--step', type=int, required=False, default=60,
+        help='Step used to sub-sample the data. \n'
+             'step=1 -> use every file (~10s cadence).\n'
+             'step=6 -> use 1 of every 6 files (~1min cadence).\n'
+             'step=60 -> use 1 of every 60 files (~10min cadence, default).'
+    )
+    parser.add_argument(
+        '-w', '--workingdir', type=str, required=False, default='/lustre/ai/',
+        help='Path to save the output autocorrelation files (default: /lustre/ai/).'
+    )
+    # *** NEW: WORKERS ARGUMENT ***
+    parser.add_argument(
+        '--workers', type=int, default=os.cpu_count(),
+        help=f"Number of parallel worker processes to use (default: number of CPU cores, {os.cpu_count()})."
+    )
     
     args = parser.parse_args()
-    extract_selfcorr(args.path, args.date, args.time, args.step, args.workingdir)
+    extract_autocorrelations(args.path, args.date, args.time, args.step, args.workingdir, args.workers)
 
-    
+
+if __name__ == '__main__':
+    main()
