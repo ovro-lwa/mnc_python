@@ -6,7 +6,7 @@ mkdir -p $workingdir
 
 #msdate="20240127"
 
-last=$(date --date='yesterday' '+%Y%m%d')
+last=$(date --date='today' '+%Y%m%d')
 msdate=$last
 
 hrs=(06 07 08 09 10 11 12)
