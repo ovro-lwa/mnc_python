@@ -274,10 +274,13 @@ class Controller():
 
         for recorder in recorders:
             # skip vis recorders and assume dr1 sets appropriately for drt1
-            if recorder in ['drvs', 'drvf', 'drt1']:
+            if recorder in ['drvs', 'drvf']:
                 continue
 
-            num = int(recorder[2:])
+            if 'drt' in recorder:
+                num = int(recorder[3:])
+            else:
+                num = int(recorder[2:])
             logger.info(f"Configuring x-engine for beam {num} on xhosts {self.xhosts_up}")
             try:
                 self.bfc[num] = xengine_beamformer_control.create_and_calibrate(num, servers=self.xhosts_up,
