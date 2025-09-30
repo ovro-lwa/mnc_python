@@ -154,11 +154,13 @@ class Controller():
         for adr in aconf['adrs']:
             ma.load_cfg(adr, preset)
 
-    def start_fengine(self, snap2names=None, initialize=False, program=False, updatesettings=True):
+    def start_fengine(self, snap2names=None, initialize=False, program=False, loadprogram=False, updatesettings=True, fpg_file='default'):
         """ Start the fengines on all snap2s.
         snap2names argument allows a list of board names (e.g., ['snap02']), but defaults configuration file.
         Optionally can initialize and program, which will also run cold_start method regardless of current state.
         The config_file used should be available to the pipeline@lwacalimxx user (e.g., /home/pipeline/proj/lwa-shell/mnc_python/config/lwa...*yaml).
+        program will laod program in flash memory onto SNAP, train, and sync.
+        loadprogram will put fpg_file into flash memory. This is not commonly required.
         updatesettings will load the default settings file after initialization or programming.
         """
 
@@ -178,6 +180,14 @@ class Controller():
                 raise RuntimeError('Not all SNAPs responding.')
 
             resp = ec.send_command(0, 'controller', 'stop_poll_stats_loop')
+
+            if loadprogram:
+                if fpg_file is 'default':
+                    fpg_file = FPG_FILE
+                resp = ec.send_command(0, 'feng', 'program', timeout=90*11, n_response_expected=11, kwargs={'fpgfile': fpg_file})
+                if len(resp) < 11:
+                    raise RuntimeError('program failed. Check fengine etcd service logs.')
+                return resp
 
             resp = ec.send_command(1, 'feng', 'cold_start_from_config',
                                    kwargs={'config_file': self.config_file, 'program': program, 'initialize': initialize},

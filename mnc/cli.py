@@ -64,13 +64,16 @@ def start_xengine(full, force, xhosts):
 @cli.command()
 @click.option('--program', is_flag=True, default=False, show_default=True)
 @click.option('--initialize', is_flag=True, default=False, show_default=True)
-def start_fengine(program, initialize):
+@click.option('--new_fpg', default=None, type=str)
+def start_fengine(program, initialize, new_fpg):
     """ Start f-engine with basic mnc-python interface
     Option to program and force it to program.
+    new_fpg can be 'default', None (for no new file), or path to a fpg file
     """
 
     con = control.Controller()
-    con.start_fengine(program=program, initialize=initialize)
+    assert os.path.exists(new_fpg, f'File {new_fpg} must be accessible on Cal-Im')
+    con.start_fengine(program=program, initialize=initialize, loadprogram=new_fpg in [None, 'default'], fpg_file=new_fpg)
 
 
 @cli.command()
