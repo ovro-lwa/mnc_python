@@ -1,3 +1,4 @@
+import os.path
 import click
 from mnc import settings, control
 from mnc import myarx
@@ -72,8 +73,12 @@ def start_fengine(program, initialize, new_fpg):
     """
 
     con = control.Controller()
-    assert os.path.exists(new_fpg, f'File {new_fpg} must be accessible on Cal-Im')
-    con.start_fengine(program=program, initialize=initialize, loadprogram=new_fpg in [None, 'default'], fpg_file=new_fpg)
+    if new_fpg not in [None, 'default']:
+        assert os.path.exists(new_fpg)
+        loadprogram=True
+    else:
+        loadprogram=False
+    con.start_fengine(program=program, initialize=initialize, loadprogram=loadprogram, fpg_file=new_fpg)
 
 
 @cli.command()
