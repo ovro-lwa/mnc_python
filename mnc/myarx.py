@@ -10,6 +10,10 @@
 # 20230809 - fix bugs in feeOn() and feeOff() for single-channel control.
 # 20231114 - fix bug in status() when offsets not given.
 # 20240307 - Remove obsolete code lines.  Use opsdatapath.py for log file.
+# 20241104 - Add rfPowerOffsetFind().  Revise status() and status_asig() to try looking up offsets in log
+#            before making new measurements.
+# 20251024 - Revise owte() to handle negative temperatures.
+# 20251123 - status_asig:  add return of serial number and one-wire temperatures.
 
 import lwautils.lwa_arx
 import sys
@@ -20,8 +24,8 @@ import warnings
 
 arx = lwautils.lwa_arx.ARX()
 
-from mnc import opsdatapath
-RFPOWEROFFSETLOG = opsdatapath.OPSDATAPATH + 'arxPowerOffsets.log'
+DATAPATH = '/home/pipeline/opsdata/'
+RFPOWEROFFSETLOG = DATAPATH + 'arxPowerOffsets.log'
 
 def raw(adr,cmd):
     r = []
@@ -39,9 +43,11 @@ def raw2int(adr,cmd):
 
 def owte(adr):
     r = arx.raw(adr,'OWTE',1.1)
-    d = [int(r[i:i+4],16)/16 for i in range(0,len(r),4)]
+    d = [int(r[i:i+4],16) for i in range(0,len(r),4)]
+    for i in range(len(d)):
+        if d[i]>32767: d[i] -= 65536
+        d[i] /= 16
     return d
-
 def temp(adr):
     r = arx.raw(adr,'TEMP')
     return int(r[1:5],16)/10
@@ -58,6 +64,7 @@ def rfPower(adr,offset=[0]*16):
     return p
 
 def rfPowerOffset(adr):
+    print('rfPowerOffset: adr=',adr)
     set = arx.raw(adr,'GETA')     #save current configuration
     #print(len(set),set)
     #return
@@ -76,7 +83,7 @@ def rfPowerOffsetsGet():
     offsets = []
     with open(RFPOWEROFFSETLOG,'r') as f:
         lines = f.readlines()
-    lines = lines[-1:0:-1]
+    lines = lines[-1:0:-1]   #re-order lines from last to first
     for adr in range(1,46):  # all ARX addresses
         o = [[int(float(lines[i].split(',')[j])) for j in range(19)] for i in range(len(lines))]
         for i in range(len(o)):
@@ -84,6 +91,19 @@ def rfPowerOffsetsGet():
                 offsets.append(o[i][3:])
                 break
     return(offsets)
+
+def rfPowerOffsetFind(adr):
+    # Get offsets for one address; if not found return [].
+    offset=[]
+    with open(RFPOWEROFFSETLOG,'r') as f:
+        lines = f.readlines()
+    lines = lines[-1:0:-1]   #re-order lines from last to first
+    for i in range(len(lines)):
+        o = [int(float(lines[i].split(',')[j])) for j in range(19)] #parse line
+        if o[0]==adr:
+            offset = o[3:]
+            break
+    return(offset)
 
 def rfPowerSave(adr,offsets,fileprefix=''):
     # adr is a list of addresses;
@@ -162,7 +182,7 @@ def feeOn(adr,chan=0):
     if chan:
         chi = '%1X'%(chan-1)
         c = raw2int(adr,'GETC'+chi)[0] | 0x8000
-        arx.raw(adr,'SETC'+chi+'%4X'%c)
+        arx.raw(adr,'SETC'+chi+'%04X'%c)
     else:
         c = np.array(raw2int(adr,'GETA')) | 0x8000
         for i in range(len(c)):
@@ -254,7 +274,7 @@ def status(adr,offsets=[],pr=True,header=False):
         a = adr[i]
         #print(a)  #debug
         if len(adr) == 1: o = offsets
-        elif len(offsets)<len(adr): o = rfPowerOffset(a)
+        elif len(offsets)<len(adr): o = rfPowerOffsetFind(a)
         else:             o = offsets[i]
         if len(o)<16:     o = rfPowerOffset(a)
         #print('myarx.status.o:',o)
@@ -275,15 +295,19 @@ def status_asig(asig,pr=True,offsets=[],header=False):
     adr = asig2arx(asig)
     a = adr[0]
     c = adr[1]-1
-    if len(offsets)<16:
-        offsets = rfPowerOffset(a)
+    if len(offsets)<16:                # caller did not provide offsets
+        offsets = rfPowerOffsetFind(a) #   so try looking up in log
+        if len(offsets)<16:            #   not found in log
+            offsets = rfPowerOffset(a) #   so measure now.
     p = rfPower(a,offsets)
-    I = 0.4*np.array(raw2int(a,'CURA'))
-    r = raw2int(a,'GETA')
-    cfg = chanDecode(r[c])
+    I = 0.4*np.array(raw2int(a,'CURA'))# input current, mA or .01 mA
+    r = raw2int(a,'GETA')              # configuration for all channels
+    cfg = chanDecode(r[c])             # configuragion for desired channel
+    sn = raw2int(a,'ARXN')[0]          # serial number
+    tmps = owte(a)                     # one-wire temperatures
     if pr and header: print('sig','adr','ch','config','I/mA','P/dBm')
     if pr: print(asig,a,c+1,chanDecode(r[c]),format(I[c],'.1f'),format(10*np.log10(p[c])+30,'.2f'))
-    return [asig,cfg[0],cfg[1],cfg[2],cfg[3],I[c],p[c]]
+    return [asig] + list(cfg) + [I[c],p[c],sn] + list(tmps)
 
 def set_asig(asig,at1,at2,filter,inputOn):
     # Configure one channel by asig number
