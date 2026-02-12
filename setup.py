@@ -7,7 +7,6 @@ setup(name='mnc-python',
       install_requires=['astropy',
                         'progressbar',
                         'myst-parser',
-                        'setuptools_scm<7',
                         'markdown<3.4'],
       packages=['mnc'],
       entry_points='''
