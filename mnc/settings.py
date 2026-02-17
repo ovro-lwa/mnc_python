@@ -114,8 +114,14 @@ class Settings():
 
         for i in snaps:
             ec.send_command(i,'pfb','set_fft_shift',kwargs={'shift':int(fftshift)})
-        logger.info(f'All FFT shifts set to {fftshift}')
 
+        pfb_shift = ec.send_command(0, 'pfb', 'get_fft_shift', n_response_expected=11)
+        if len(pfb_shift) != 11 or not all(pfb_shift.values()):
+            logger.warning('Not all SNAPs set to FFT shift. Check logs.')
+            return False
+        else:
+            logger.info('All SNAPs set to FFT shift.')
+            return True
 
         #=====================================
         # LOAD F ENGINE EQUALIZATION FUNCTIONS
@@ -294,10 +300,12 @@ def update(filename=LATEST_SETTINGS):
     settings = Settings(filename=filename)
     # watch out for the order of load_arx and load_feng, load_feng currently calls feeOff through ARX.
     settings.load_arx()
-    settings.update_log()   # TODO: migrate away from this and to obsstate
-    settings.load_feng()
-    try:
-#        t_now = time.asctime(time.gmtime(time.time()))  # let add_settings handle this
-        obsstate.add_settings(filename)
-    except:
-        logger.warning('Could not add settings to obsstate.')
+    status = settings.load_feng()
+    if status:
+        settings.update_log()   # TODO: migrate away from this and to obsstate
+        try:
+            obsstate.add_settings(filename)
+        except Exception as exc:
+            logger.warning(f'Could not add settings to obsstate. {exc}')
+
+    return status
