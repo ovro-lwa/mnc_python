@@ -39,6 +39,24 @@ VOLT_FILTER_CODES = {1:   250000,
                      6:  9800000,
                      7: 19600000}
 
+_BEAM_RECORDERS = tuple(f'dr{n}' for n in range(1, 11)) + tuple(f'drt{n}' for n in range(1, 3))
+
+
+def _recording_path_from_response(response):
+    """Return absolute data file path from a record command response, or None."""
+    try:
+        payload = response['response']
+        filename = payload['filename']
+    except (KeyError, TypeError):
+        return None
+    if os.path.isabs(filename):
+        return filename
+    directory = payload.get('directory')
+    if directory:
+        return os.path.join(directory, filename)
+    return filename
+
+
 class Controller():
     """ Parse configuration and control all subsystems in uniform manner.
     Ideally, will also make it easy to monitor basic system status.
@@ -473,6 +491,13 @@ class Controller():
         teng_f1/2 are the central frequencies of t-engine tunings in units of Hz.
         f0 sets bandwidth as integer from 1 (250kHz) to 7 (19.6MHz).
         gain1/2 are t-engine re-quantization gains from 0 (most gain) to 15 (least gain).
+
+        Returns
+        -------
+        dict
+            Successful beam recordings keyed by recorder name. Each value has
+            ``status``, ``path``, ``filename``, and ``directory``. Recorders
+            without a filename are omitted.
         """
 
         dconf = self.conf['dr']
@@ -500,6 +525,7 @@ class Controller():
                 
         # start ms writing
         logger.info(f"Starting recorders {recorders} at {start.mjd} (currently {Time.now().mjd})")
+        recordings = {}
         for recorder in recorders:
             # treat encoded recorder name "drt1raw" interpreted as "drt1" with a "raw_record" command.
             record_command = "raw_record" if "raw" in recorder else "record"
@@ -564,11 +590,22 @@ class Controller():
                 except (KeyError, TypeError):
                     pass
                 logger.info(f"recording on {recorder}{rec_extra_info}")
+                if recorder in _BEAM_RECORDERS:
+                    path = _recording_path_from_response(response)
+                    if path is not None:
+                        recordings[recorder] = {
+                            'status': 'success',
+                            'path': path,
+                            'filename': os.path.basename(path),
+                            'directory': os.path.dirname(path) or '.',
+                        }
             else:
                 logger.warn(f"recording on {recorder} failed: {response['response']}")
                 
             if self.drc.read_monitor_point('summary', recorder).value != 'normal':
                 self.drc.read_monitor_point('info', recorder)
+
+        return recordings
 
     def status_dr(self, recorders=None):
         """ Print data recorder info monitor point
