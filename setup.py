@@ -1,8 +1,8 @@
 from setuptools import setup
-from setuptools_scm import get_version
+from version import get_git_version
 
 setup(name='mnc-python',
-      version=get_version(),
+      version=get_git_version(),
       url='http://github.com/ovro-lwa/mnc-python',
       install_requires=['astropy',
                         'progressbar',
