@@ -584,9 +584,19 @@ def create_and_calibrate(beam, servers=None, nserver=8, npipeline_per_server=4,
             calfiles = []
         else:
             calfiles = glob.glob(os.path.join(cal_directory, '*.bcal'))
-            calfiles.sort()
             if len(calfiles) == 0:
                 logger.warn(f"No calibration data found in '{cal_directory}'")
+            else:
+                def _bcal_timestamp(path):
+                    name = os.path.basename(path)
+                    parts = name.split('_', 2)
+                    if len(parts) >= 2:
+                        return f"{parts[0]}_{parts[1]}"
+                    return name
+
+                latest_ts = max(_bcal_timestamp(f) for f in calfiles)
+                calfiles = sorted(f for f in calfiles if _bcal_timestamp(f) == latest_ts)
+                logger.info(f"Using {len(calfiles)} calibration table(s) from {latest_ts}")
         
         # Load the calibration data, if found
         for calfile in calfiles:
