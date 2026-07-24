@@ -1,9 +1,11 @@
-import os.path
+import os
 import glob
 import scipy.io as mat
 import time
 import numpy as np
 import getpass
+import fcntl
+from contextlib import contextmanager
 
 from mnc import myarx as a
 from mnc import common
@@ -12,6 +14,24 @@ from observing import obsstate
 
 DATAPATH = '/home/pipeline/opsdata'
 DAYONLY = True
+SETTINGS_LOG_NAME = 'arxAndF-settings.log'
+
+
+@contextmanager
+def settings_log_lock(path=DATAPATH, exclusive=True):
+    """Serialize access to arxAndF-settings.log via a sidecar lock file.
+
+    Uses fcntl advisory locks (work over NFSv4). Writers should use exclusive=True;
+    readers may use exclusive=False for a shared lock.
+    """
+    lock_path = os.path.join(path, SETTINGS_LOG_NAME + '.lock')
+    # 'a+' creates the lock file if needed without truncating
+    with open(lock_path, 'a+') as lockf:
+        fcntl.flock(lockf.fileno(), fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+        try:
+            yield
+        finally:
+            fcntl.flock(lockf.fileno(), fcntl.LOCK_UN)
 
 LIST_SETTINGS = sorted([(fn, os.path.basename(fn).split('-')[0]) for fn in glob.glob(DATAPATH + '/*settings*mat')], key=lambda x: x[1])
 if len(LIST_SETTINGS):
@@ -94,8 +114,9 @@ class Settings():
             return obsstate.read_latest_setting()
         except Exception as exc:
             logger.warn(f"Failed to read settings from database. Using logfile")
-            with open(os.path.join(path, 'arxAndF-settings.log'), 'r') as f:
-                return os.path.join(DATAPATH, f.readlines()[-1].split()[-2])
+            with settings_log_lock(DATAPATH, exclusive=False):
+                with open(os.path.join(DATAPATH, SETTINGS_LOG_NAME), 'r') as f:
+                    return os.path.join(DATAPATH, f.readlines()[-1].split()[-2])
 
     def load_feng(self, zero_unused_feng_input=False):
         """ Load settings for f-engine to the SNAP2 boards.
@@ -287,13 +308,16 @@ class Settings():
                 continue
 
     def update_log(self, path=DATAPATH):
-        """ Add line to logging file
+        """ Add line to logging file (exclusive-locked against concurrent writers).
         """
-
-
-        with open(os.path.join(path, 'arxAndF-settings.log'), 'a') as f:
-            t = time.time()
-            print(time.asctime(time.gmtime(t)), t, getpass.getuser(), os.path.basename(self.filename), self.config['time'], sep='\t',file=f)
+        with settings_log_lock(path, exclusive=True):
+            with open(os.path.join(path, SETTINGS_LOG_NAME), 'a') as f:
+                t = time.time()
+                print(time.asctime(time.gmtime(t)), t, getpass.getuser(),
+                      os.path.basename(self.filename), self.config['time'],
+                      sep='\t', file=f)
+                f.flush()
+                os.fsync(f.fileno())
 
 
 def update(filename=LATEST_SETTINGS):
