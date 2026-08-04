@@ -140,9 +140,7 @@ class Settings():
         if len(pfb_shift) != 11 or not all(pfb_shift.values()):
             logger.warning('Not all SNAPs set to FFT shift. Check logs.')
             return False
-        else:
-            logger.info('All SNAPs set to FFT shift.')
-            return True
+        logger.info('All SNAPs set to FFT shift.')
 
         #=====================================
         # LOAD F ENGINE EQUALIZATION FUNCTIONS
@@ -281,6 +279,8 @@ class Settings():
                 address, channel = mapping.antpol_to_arx(antname, pol)
                 a.feeOff(address, channel)
             print('Turned off',len(off),'signals: dsig=',off)        
+
+        return True
 
 
     def load_arx(self):
