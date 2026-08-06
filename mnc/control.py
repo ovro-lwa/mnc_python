@@ -18,7 +18,7 @@ try:
 except ImportError:
     logger.warning('No f-eng library found. Skipping.')
 try:
-    from lwa352_pipeline_control import Lwa352CorrelatorControl, BeamPointingControl  # xengine
+    from lwa352_pipeline_control import Lwa352CorrelatorControl  # xengine
 except ImportError:
     logger.warning('No x-eng library found. Skipping.')
 

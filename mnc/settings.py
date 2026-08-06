@@ -1,5 +1,6 @@
 import os.path
 import glob
+import fcntl
 import scipy.io as mat
 import time
 import numpy as np
@@ -26,6 +27,19 @@ else:
 DELAY_OFFSET = 10 # minimum delay
 ADC_CLOCK = 196000000    # sampling clock frequency, Hz
 snaps = range(1,12)
+
+# PFB firmware hardcodes the lowest FFT shift stages (see lwa_f.blocks.pfb.Pfb).
+_PFB_STAGES = 13
+_PFB_SHIFT_MASK = 0b11111
+_PFB_SHIFT_VAL = 0b11111
+
+
+def _effective_fft_shift(shift):
+    """Return the FFT shift value after PFB firmware masking."""
+    shift = int(shift) & (2**_PFB_STAGES - 1)
+    if shift & _PFB_SHIFT_MASK != _PFB_SHIFT_VAL:
+        shift = (_PFB_SHIFT_VAL + (shift & ~_PFB_SHIFT_MASK)) & (2**_PFB_STAGES - 1)
+    return shift
 
 logger = common.get_logger(__name__)
 
@@ -94,7 +108,8 @@ class Settings():
             return obsstate.read_latest_setting()
         except Exception as exc:
             logger.warn(f"Failed to read settings from database. Using logfile")
-            with open(os.path.join(path, 'arxAndF-settings.log'), 'r') as f:
+            with open(os.path.join(DATAPATH, 'arxAndF-settings.log'), 'r') as f:
+                fcntl.flock(f.fileno(), fcntl.LOCK_SH)
                 return os.path.join(DATAPATH, f.readlines()[-1].split()[-2])
 
     def load_feng(self, zero_unused_feng_input=False):
@@ -115,13 +130,30 @@ class Settings():
         for i in snaps:
             ec.send_command(i,'pfb','set_fft_shift',kwargs={'shift':int(fftshift)})
 
+        expected_shift = _effective_fft_shift(fftshift)
         pfb_shift = ec.send_command(0, 'pfb', 'get_fft_shift', n_response_expected=11)
-        if len(pfb_shift) != 11 or not all(pfb_shift.values()):
-            logger.warning('Not all SNAPs set to FFT shift. Check logs.')
+        missing = [snap for snap in snaps if pfb_shift.get(snap) is None]
+        mismatched = {
+            snap: got for snap, got in pfb_shift.items()
+            if got is not None and got != expected_shift
+        }
+        if len(pfb_shift) != 11 or missing or mismatched:
+            if missing:
+                logger.warning(
+                    'Missing PFB FFT shift response from SNAPs %s (expected 0x%x).',
+                    missing, expected_shift,
+                )
+            if mismatched:
+                logger.warning(
+                    'PFB FFT shift mismatch on SNAPs %s (expected 0x%x): %s',
+                    list(mismatched.keys()), expected_shift,
+                    {snap: '0x%x' % got for snap, got in mismatched.items()},
+                )
+            if not missing and not mismatched:
+                logger.warning('Not all SNAPs set to FFT shift. Check logs.')
             return False
-        else:
-            logger.info('All SNAPs set to FFT shift.')
-            return True
+
+        logger.info('All SNAPs set to FFT shift 0x%x.', expected_shift)
 
         #=====================================
         # LOAD F ENGINE EQUALIZATION FUNCTIONS
@@ -261,6 +293,8 @@ class Settings():
                 a.feeOff(address, channel)
             print('Turned off',len(off),'signals: dsig=',off)        
 
+        return True
+
 
     def load_arx(self):
         """ Load settings for ARX
@@ -292,6 +326,7 @@ class Settings():
 
 
         with open(os.path.join(path, 'arxAndF-settings.log'), 'a') as f:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
             t = time.time()
             print(time.asctime(time.gmtime(t)), t, getpass.getuser(), os.path.basename(self.filename), self.config['time'], sep='\t',file=f)
 
