@@ -26,6 +26,18 @@ from mnc import mcs, xengine_beamformer_control
 
 
 CONFIG_FILE = '/home/pipeline/proj/lwa-shell/mnc_python/config/lwa_config_calim.yaml'
+
+
+def _flag_antname_to_correlator(antname):
+    """Convert a polarized LWA antenna name to its correlator number."""
+    antname = str(antname)
+    if antname.endswith(('A', 'B')):
+        antname = antname[:-1]
+    if not antname.startswith('LWA-'):
+        antname = 'LWA-' + antname
+    return mapping.antname_to_correlator(antname)
+
+
 FPG_FILE = '/home/pipeline/proj/lwa-shell/caltech-lwa/snap2_f_200msps_64i_4096c/outputs/snap2_f_200msps_64i_4096c.fpg'
 
 CORE_RADIUS_M = 200.0
@@ -371,9 +383,17 @@ class Controller():
 
         # we convert antnames into corr_nums and ignore pol info
         if isinstance(flag_ants, str):
-            mjd, flag_ants = anthealth.get_badants(flag_ants)
+            flag_method = flag_ants
+            try:
+                mjd, flag_ants = anthealth.get_badants(flag_method)
+            except RuntimeError:
+                if flag_method != 'caltable':
+                    raise
+                logger.warning("No caltable antenna-health list is available; "
+                               "falling back to selfcorr")
+                mjd, flag_ants = anthealth.get_badants('selfcorr')
         assert isinstance(flag_ants, list)
-        flag_ants = list({f"{mapping.antname_to_correlator('LWA-'+antname.rstrip('A').rstrip('B')):03}" for antname in flag_ants})
+        flag_ants = list({f"{_flag_antname_to_correlator(antname):03}" for antname in flag_ants})
 
         if (callable(uvweight)):
             assert uvweight.__code__.co_argcount == 1, "uvweight function must only take one argument"
