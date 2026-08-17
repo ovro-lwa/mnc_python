@@ -13,7 +13,55 @@ for _mod in (
 ):
     sys.modules.setdefault(_mod, MagicMock())
 
-from mnc.control import Controller, _recording_path_from_response
+from mnc.control import (
+    Controller,
+    _flag_antname_to_correlator,
+    _recording_path_from_response,
+)
+
+
+class TestFlagAntnameToCorrelator(unittest.TestCase):
+    @patch("mnc.control.mapping.antname_to_correlator")
+    def test_accepts_full_polarized_name(self, convert):
+        convert.return_value = 17
+
+        self.assertEqual(_flag_antname_to_correlator("LWA-002A"), 17)
+        convert.assert_called_once_with("LWA-002")
+
+    @patch("mnc.control.mapping.antname_to_correlator")
+    def test_accepts_numeric_polarized_name(self, convert):
+        convert.return_value = 18
+
+        self.assertEqual(_flag_antname_to_correlator("003B"), 18)
+        convert.assert_called_once_with("LWA-003")
+
+
+class TestControlBfAntennaHealth(unittest.TestCase):
+    @patch("mnc.control._flag_antname_to_correlator", return_value=2)
+    @patch("mnc.control.anthealth.get_badants")
+    def test_caltable_falls_back_to_selfcorr(self, get_badants, convert):
+        get_badants.side_effect = [
+            RuntimeError("missing caltable state"),
+            (61269.0, ["LWA-002A"]),
+        ]
+        controller = Controller.__new__(Controller)
+        beam = MagicMock()
+        beam.cal_set = True
+        controller.bfc = {5: beam}
+
+        controller.control_bf(
+            num=5,
+            targetname="sun",
+            track=False,
+            flag_ants="caltable",
+        )
+
+        self.assertEqual(
+            get_badants.call_args_list,
+            [unittest.mock.call("caltable"), unittest.mock.call("selfcorr")],
+        )
+        convert.assert_called_once_with("LWA-002A")
+        beam.set_beam_target.assert_called_once_with("sun")
 
 
 class TestRecordingPathFromResponse(unittest.TestCase):

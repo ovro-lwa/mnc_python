@@ -115,8 +115,14 @@ def get_badants(method, time=None, naming='antname'):
             dd = ls.get_dict(f'/mon/anthealth/{method}')
         else:
             dd = ls.get_dict(f'/mon/anthealth/{method}/{float(mjd0)}')
+        if dd is None:
+            raise RuntimeError(f"No antenna-health data are available for {method}")
+        if not all(key in dd for key in ('flagged', 'antname', 'time')):
+            raise RuntimeError(f"Antenna-health data for {method} are incomplete")
         antstatus = dd['flagged']
         antnames = dd['antname']
+        if len(antstatus) != len(antnames):
+            raise RuntimeError(f"Antenna-health data for {method} have inconsistent lengths")
         if mjd0 is None:
             mjd0 = float(dd['time'])
     elif method == 'union_and':
@@ -132,7 +138,7 @@ def get_badants(method, time=None, naming='antname'):
 
     badants = np.array(antnames)[np.where(antstatus)].tolist()
 
-    if naming is "corr_num":
+    if naming == "corr_num":
         logger.debug("mapping antname to corr_num")
         badants2 = []
         for antname in badants:
@@ -158,4 +164,3 @@ def caltable_flags(caltable):
                       for (corrnum, pol) in zip(*np.where(allflg))])
 
     return badants
-
