@@ -177,8 +177,11 @@ class Controller():
         snap2names argument allows a list of board names (e.g., ['snap02']), but defaults configuration file.
         Optionally can initialize and program, which will also run cold_start method regardless of current state.
         The config_file used should be available to the pipeline@lwacalimxx user (e.g., /home/pipeline/proj/lwa-shell/mnc_python/config/lwa...*yaml).
-        program will laod program in flash memory onto SNAP, train, and sync.
-        loadprogram will put fpg_file into flash memory. This is not commonly required.
+        program first loads an .fpg file with the existing lwa_f Snap2Fengine.program(fpgfile=...)
+        method (via etcd), then cold-starts so ADC training and sync still run.
+        loadprogram is the same upload step, using fpg_file.
+        fpg_file may be 'default' (the standard image), None (treated as default
+        when programming), or a path to a .fpg file.
         updatesettings will load the default settings file after initialization or programming.
         """
 
@@ -193,23 +196,42 @@ class Controller():
         ec = snap2_feng_etcd_client.Snap2FengineEtcdControl()
         is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
 
-        if initialize or program:
+        do_program = program or loadprogram
+        if initialize or do_program:
             if len(is_programmed) != 11:
-                raise RuntimeError('Not all SNAPs responding.')
+                if do_program:
+                    logger.warning(
+                        'Not all SNAPs reporting programmed (%s/11); '
+                        'continuing so an .fpg file can be loaded.' % len(is_programmed)
+                    )
+                else:
+                    raise RuntimeError('Not all SNAPs responding.')
 
             resp = ec.send_command(0, 'controller', 'stop_poll_stats_loop')
 
-            if loadprogram:
-                if fpg_file is 'default':
+            if do_program:
+                if fpg_file in (None, 'default'):
                     fpg_file = FPG_FILE
-                resp = ec.send_command(0, 'feng', 'program', timeout=90*11, n_response_expected=11, kwargs={'fpgfile': fpg_file})
+                logger.info(f"Loading fpg file {fpg_file} onto all SNAP2 boards")
+                # Existing lwa_f method: Snap2Fengine.program(fpgfile=..., force=True)
+                resp = ec.send_command(
+                    0, 'feng', 'program',
+                    timeout=90 * 11,
+                    n_response_expected=11,
+                    kwargs={'fpgfile': fpg_file, 'force': True},
+                )
                 if len(resp) < 11:
                     raise RuntimeError('program failed. Check fengine etcd service logs.')
-                return resp
 
+            start_kwargs = {
+                'config_file': self.config_file,
+                'program': program or do_program,
+                'initialize': initialize or do_program,
+            }
+            snap01_timeout = 120
             resp = ec.send_command(1, 'feng', 'cold_start_from_config',
-                                   kwargs={'config_file': self.config_file, 'program': program, 'initialize': initialize},
-                                   timeout=120)
+                                   kwargs=start_kwargs,
+                                   timeout=snap01_timeout)
             if resp is None:
                 raise RuntimeError('cold_start_from_config failed. Check f-engine etcd service logs as pipeline@calim.')
 
@@ -219,11 +241,12 @@ class Controller():
                 logger.info(f"Initializing board {snap2name}")
                 snap2num = int(snap2name.lstrip('snap'))
                 resp = ec.send_command(snap2num, 'feng', 'cold_start_from_config',
-                                        kwargs={'config_file': self.config_file, 'program': program, 'initialize': initialize},
+                                        kwargs=start_kwargs,
                                         timeout=0)
 
-            logger.info("Waiting 120 seconds (ignore warning messages above)")
-            time.sleep(120)
+            wait_s = 120
+            logger.info(f"Waiting {wait_s} seconds (ignore warning messages above)")
+            time.sleep(wait_s)
             resp = ec.send_command(0, 'controller', 'start_poll_stats_loop')
             is_programmed = ec.send_command(0, 'fpga', 'is_programmed', n_response_expected=11)
             if len(is_programmed) != 11 or not all(is_programmed.values()):

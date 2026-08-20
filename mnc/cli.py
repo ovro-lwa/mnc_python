@@ -62,23 +62,39 @@ def start_xengine(full, force, xhosts):
     con.configure_xengine(full=full, force=force)
 
 
+def _loadprogram_from_new_fpg(new_fpg):
+    """Return (loadprogram, fpg_file) for Controller.start_fengine.
+
+    ``new_fpg`` may be None (do not load a bitstream), ``'default'`` (load the
+    standard image), or a filesystem path to a ``.fpg`` file.
+    """
+
+    if new_fpg is None:
+        return False, 'default'
+    if new_fpg == 'default':
+        return True, 'default'
+    if not os.path.exists(new_fpg):
+        raise click.BadParameter(f'fpg file not found: {new_fpg}', param_hint='--new-fpg')
+    return True, os.path.abspath(new_fpg)
+
+
 @cli.command()
 @click.option('--program', is_flag=True, default=False, show_default=True)
 @click.option('--initialize', is_flag=True, default=False, show_default=True)
-@click.option('--new_fpg', default=None, type=str)
+@click.option('--new-fpg', '--new_fpg', 'new_fpg', default=None, type=str,
+              help="Path to a .fpg file, or 'default' to load the standard firmware image.")
 def start_fengine(program, initialize, new_fpg):
-    """ Start f-engine with basic mnc-python interface
-    Option to program and force it to program.
-    new_fpg can be 'default', None (for no new file), or path to a fpg file
+    """ Start f-engine with basic mnc-python interface.
+
+    --program loads the standard .fpg image with the existing lwa_f
+    Snap2Fengine.program(fpgfile=...) method, then trains and syncs.
+    Use --new-fpg to choose a different image. --initialize resets firmware
+    without uploading a bitstream.
     """
 
     con = control.Controller()
-    if new_fpg not in [None, 'default']:
-        assert os.path.exists(new_fpg)
-        loadprogram=True
-    else:
-        loadprogram=False
-    con.start_fengine(program=program, initialize=initialize, loadprogram=loadprogram, fpg_file=new_fpg)
+    loadprogram, fpg_file = _loadprogram_from_new_fpg(new_fpg)
+    con.start_fengine(program=program, initialize=initialize, loadprogram=loadprogram, fpg_file=fpg_file)
 
 
 @cli.command()
