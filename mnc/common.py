@@ -39,7 +39,7 @@ OVRO_EPOCH       = datetime(1970, 1, 1, 0, 0, 0, 0)
 
 
 #: etcd hostname - can be overridden with a 'ETCD_HOST = ...' line in 'etcd.cfg' file
-ETCD_HOST = 'etcdv3service'
+ETCD_HOST = 'etcdv3.sas.pvt'
 #ETCD_HOST = 'lxdlwacr'  # alternate
 
 
