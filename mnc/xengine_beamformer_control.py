@@ -25,6 +25,7 @@ speedOfLight = speedOfLight.to('m/ns').value
 from lwa_antpos.station import ovro
 
 from mnc.common import NPIPELINE, chan_to_freq, ETCD_HOST, get_logger
+from mnc.tiptilt import get_tiptilt
 
 logger = get_logger(__name__)
 
@@ -536,8 +537,11 @@ class BeamTracker(object):
                 ## update takes
                 t_mark = time.time()
                 
-                ## Figure out where the target will be in puto seconds
-                aa = sc.transform_to(AltAz(obstime=Time.now()+puto, location=obs))
+                ## Apply the tip-tilt shift, then figure out where the corrected
+                ## target will be in puto seconds.  sc itself is left unchanged.
+                dra_as, ddec_as = get_tiptilt(sc, location=obs)
+                sc_pt = sc.transform_to('fk5').spherical_offsets_by(dra_as * u.arcsec, ddec_as * u.arcsec)
+                aa = sc_pt.transform_to(AltAz(obstime=Time.now()+puto, location=obs))
                 az = aa.az.deg
                 alt = aa.alt.deg
                 logger.info(f"At {time.time():.1f}, moving to azimuth {aa.az}, altitude {aa.alt}")
