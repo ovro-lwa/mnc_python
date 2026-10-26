@@ -48,6 +48,7 @@ import json
 import os
 import time
 from threading import RLock
+from typing import Optional, Tuple
 
 import numpy
 from astropy.coordinates import AltAz, EarthLocation, SkyCoord
@@ -144,7 +145,7 @@ def set_tiptilt(path, ttl_sec, client=None):
             etcd.close()
 
 
-def get_tiptilt(coord: SkyCoord, location: EarthLocation | None = None, client=None) -> tuple[float, float]:
+def get_tiptilt(coord: SkyCoord, location: Optional[EarthLocation] = None, client=None) -> Tuple[float, float]:
     """Return ``(dra_arcsec, ddec_arcsec)`` at ``coord``.
 
     ``coord`` is an Astropy ``SkyCoord``. ``location`` is an
