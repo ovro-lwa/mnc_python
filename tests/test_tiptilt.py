@@ -310,8 +310,53 @@ class TestTipTilt(unittest.TestCase):
                 dra, ddec = get_tiptilt(coord, 40, location=_location(), client=client)
         self.assertEqual((dra, ddec), (0.0, 0.0))
         message = log.warning.call_args[0][0]
-        self.assertIn("expected a .npz archive or a .npy dict", message)
+        self.assertIn("expected a .npz/.npy named-array map or a flow", message)
         self.assertIn(path, message)
+
+    def test_flow_npy_zenith_converts_west_north_to_dra_ddec(self):
+        location = _location()
+        obstime = Time("2025-10-30T05:17:42", scale="utc")
+        client = FakeEtcd()
+        n = 5
+        c = n // 2
+        flow = numpy.zeros((n, n, 2), dtype="<f4")
+        flow[c, c, 0] = 3.0   # west arcsec
+        flow[c, c, 1] = 5.0   # north arcsec
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "flow_82MHz_20251030_051742.npy")
+            numpy.save(path, flow)
+            set_tiptilt(path, 60, 82, client=client)
+            coord = _coord_at(location, obstime.unix, 0.0, 90.0)
+            got = get_tiptilt(coord, 82, location=location, client=client)
+        # dra = -west, ddec = north (REQUIRES VERIFICATION)
+        self.assertAlmostEqual(got[0], -3.0, places=6)
+        self.assertAlmostEqual(got[1], 5.0, places=6)
+
+    def test_flow_npy_below_horizon_returns_zero(self):
+        location = _location()
+        obstime = Time("2025-10-30T05:17:42", scale="utc")
+        client = FakeEtcd()
+        flow = numpy.ones((5, 5, 2), dtype="<f4")
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "flow_82MHz_20251030_051742.npy")
+            numpy.save(path, flow)
+            set_tiptilt(path, 60, 82, client=client)
+            coord = _coord_at(location, obstime.unix, 0.0, -1.0)
+            got = get_tiptilt(coord, 82, location=location, client=client)
+        self.assertEqual(got, (0.0, 0.0))
+
+    def test_example_flow_file_loads_when_present(self):
+        path = os.path.abspath("flow_82MHz_20251030_051742.npy")
+        if not os.path.exists(path):
+            self.skipTest("example flow map not in working directory")
+        location = _location()
+        obstime = Time("2025-10-30T05:17:42", scale="utc")
+        client = FakeEtcd()
+        set_tiptilt(path, 60, 82, client=client)
+        coord = _coord_at(location, obstime.unix, 0.0, 90.0)
+        dra, ddec = get_tiptilt(coord, 82, location=location, client=client)
+        self.assertTrue(numpy.isfinite(dra) and numpy.isfinite(ddec))
+        self.assertNotEqual((dra, ddec), (0.0, 0.0))
 
     def test_get_tiptilt_path_is_none_without_a_publication(self):
         self.assertIsNone(get_tiptilt_path(40, client=FakeEtcd()))

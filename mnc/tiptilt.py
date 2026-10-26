@@ -23,9 +23,8 @@ Etcd key
     :func:`get_tiptilt` uses ``frequency_mhz`` to select the entry. A request
     for a frequency that is absent or expired does not read a different entry.
 
-Map file
-    Either a ``.npz`` archive or a ``.npy`` file that holds a dict (via
-    ``numpy.save``). Both use the same float64 arrays:
+Map file (named arrays)
+    A ``.npz`` archive or a ``.npy`` dict (via ``numpy.save``) with:
 
     - ``az_deg`` — shape ``(n_az,)``, strictly increasing Astropy ``AltAz``
       azimuth in degrees (north through east). Azimuth does not wrap. A
@@ -37,13 +36,31 @@ Map file
       the grid. Zenith at that time has right ascension equal to the local
       apparent sidereal time and declination equal to the station latitude.
 
+Map file (OVRO-LWA flow ``.npy``)
+    A single array of shape ``(n, n, 2)``. Filename
+    ``flow_<freq>MHz_<YYYYMMDD>_<HHMMSS>.npy``. Conventions below are
+    implemented as stated and **require verification** against the map
+    producer:
+
+    - Zenith-centered SIN (direction-cosine) grid; center pixel is zenith;
+      the array edge is the horizon (``REQUIRES VERIFICATION``).
+    - Component 0 is a west-positive offset in arcseconds; component 1 is
+      a north-positive offset in arcseconds (``REQUIRES VERIFICATION``).
+    - Those offsets are already FK5 true-angle sky shifts suitable for
+      ``SkyCoord.spherical_offsets_by`` after converting west→east
+      (``dra = -west``, ``ddec = north``) (``REQUIRES VERIFICATION``).
+    - Pixel axes: column increases west, row increases south
+      (``REQUIRES VERIFICATION``).
+    - Map epoch is the UTC time in the filename; the station is OVRO-LWA.
+
 Lookup and apply
-    The sample coordinate is the target transformed to ``AltAz`` at
-    ``obstime_unix`` and the station location. Offsets are bilinearly
-    interpolated on ``(el_deg, az_deg)``. The tracker applies them in FK5 with
-    ``SkyCoord.spherical_offsets_by`` and then transforms that corrected
-    coordinate to the pointing time. Callers must not add the shift onto a
-    coordinate that was already corrected.
+    The sample coordinate is the target transformed to ``AltAz`` at the
+    map epoch and the station location. Named-array maps interpolate on
+    ``(el_deg, az_deg)``. Flow maps convert az/el to SIN pixels, then
+    interpolate. The tracker applies the returned ``(dra, ddec)`` in FK5
+    with ``SkyCoord.spherical_offsets_by`` and then transforms that
+    corrected coordinate to the pointing time. Callers must not add the
+    shift onto a coordinate that was already corrected.
 
 Zero shift
     :func:`get_tiptilt` returns ``(0.0, 0.0)`` and does not raise when the key
@@ -76,6 +93,8 @@ TIPTILT_ETCD_KEY = "/mon/beamformer/tiptilt"
 
 _SHIFT_LOG_TOL_ARCSEC = 1e-3
 _FREQUENCY_IN_NAME = re.compile(r"_(\d+)MHz")
+_FLOW_NAME = re.compile(
+    r"^flow_(\d+)MHz_(\d{8})_(\d{6})\.npy$", re.IGNORECASE)
 
 _lock = RLock()
 _cache = {}
@@ -84,20 +103,72 @@ _last_fallback = {}
 
 
 class _InvalidMap(Exception):
-    """The .npz file opened but does not match the shift-map schema."""
+    """The map file opened but does not match a supported shift-map schema."""
 
 
 class _UnreadableFile(Exception):
-    """The .npz path could not be opened."""
+    """The map path could not be opened."""
 
 
 class _Grid(object):
+    """Named-array az/el map."""
+
     def __init__(self, az_deg, el_deg, interp_dra, interp_ddec, obstime_unix):
         self.az_deg = az_deg
         self.el_deg = el_deg
         self.interp_dra = interp_dra
         self.interp_ddec = interp_ddec
         self.obstime_unix = obstime_unix
+
+    def sample(self, az_deg, el_deg):
+        if (
+            az_deg < self.az_deg[0] or az_deg > self.az_deg[-1]
+            or el_deg < self.el_deg[0] or el_deg > self.el_deg[-1]
+        ):
+            return float("nan"), float("nan"), True
+        dra = float(self.interp_dra((el_deg, az_deg)))
+        ddec = float(self.interp_ddec((el_deg, az_deg)))
+        return dra, ddec, False
+
+
+class _FlowGrid(object):
+    """OVRO-LWA SIN-projection flow map. Conventions require verification."""
+
+    def __init__(self, west_arcsec, north_arcsec, obstime_unix):
+        n = west_arcsec.shape[0]
+        self.n = n
+        self.center = 0.5 * (n - 1)
+        rows = numpy.arange(n, dtype="<f8")
+        cols = numpy.arange(n, dtype="<f8")
+        self.interp_west = RegularGridInterpolator(
+            (rows, cols), west_arcsec, bounds_error=False, fill_value=numpy.nan)
+        self.interp_north = RegularGridInterpolator(
+            (rows, cols), north_arcsec, bounds_error=False, fill_value=numpy.nan)
+        self.obstime_unix = obstime_unix
+
+    def sample(self, az_deg, el_deg):
+        # REQUIRES VERIFICATION: zenith-centered SIN; horizon at array edge;
+        # +x west, +y north; column increases west; row increases south.
+        az = numpy.deg2rad(az_deg)
+        el = numpy.deg2rad(el_deg)
+        cos_el = numpy.cos(el)
+        west = -cos_el * numpy.sin(az)
+        north = cos_el * numpy.cos(az)
+        radius = numpy.hypot(west, north)
+        if not numpy.isfinite(radius) or radius > 1.0 + 1e-12 or el_deg < 0.0:
+            return float("nan"), float("nan"), True
+        col = self.center + west * self.center
+        row = self.center - north * self.center
+        if (
+            row < 0.0 or row > self.n - 1
+            or col < 0.0 or col > self.n - 1
+        ):
+            return float("nan"), float("nan"), True
+        west_arcsec = float(self.interp_west((row, col)))
+        north_arcsec = float(self.interp_north((row, col)))
+        # REQUIRES VERIFICATION: stored vectors are FK5 offsets with +x west,
+        # +y north; spherical_offsets_by wants east-positive dra.
+        return -west_arcsec, north_arcsec, False
 
 
 def _logger():
@@ -226,11 +297,9 @@ def get_tiptilt(coord: SkyCoord, frequency_mhz, location: Optional[EarthLocation
     aa = coord.transform_to(AltAz(obstime=obstime, location=location))
     az = float(aa.az.deg)
     el = float(aa.alt.deg)
-    if az < grid.az_deg[0] or az > grid.az_deg[-1] or el < grid.el_deg[0] or el > grid.el_deg[-1]:
+    dra, ddec, outside = grid.sample(az, el)
+    if outside:
         return _report(0.0, 0.0, az, el, "outside map", path, frequency_mhz)
-
-    dra = float(grid.interp_dra((el, az)))
-    ddec = float(grid.interp_ddec((el, az)))
     if not (numpy.isfinite(dra) and numpy.isfinite(ddec)):
         return _report(0.0, 0.0, az, el, "invalid sample", path, frequency_mhz)
     return _report(dra, ddec, az, el, None, path, frequency_mhz)
@@ -415,6 +484,21 @@ def _cached_grid(path, written_unix):
         return grid
 
 
+def _parse_flow_obstime_unix(path):
+    """Return UTC unix seconds from ``flow_<freq>MHz_<YYYYMMDD>_<HHMMSS>.npy``."""
+
+    matched = _FLOW_NAME.match(os.path.basename(path))
+    if matched is None:
+        raise _InvalidMap(
+            "flow map filename must be flow_<freq>MHz_<YYYYMMDD>_<HHMMSS>.npy")
+    stamp = matched.group(2) + matched.group(3)
+    try:
+        obstime = Time.strptime(stamp, "%Y%m%d%H%M%S", scale="utc")
+    except ValueError as exc:
+        raise _InvalidMap("flow map timestamp is not a valid UTC time") from exc
+    return float(obstime.unix)
+
+
 def _load_arrays(data):
     """Return the five map arrays from an NpzFile or a dict-like object."""
 
@@ -431,32 +515,8 @@ def _load_arrays(data):
     return az_deg, el_deg, dra, ddec, obstime
 
 
-def _arrays_from_path(path):
-    """Load map arrays from a ``.npz`` archive or a dict saved as ``.npy``."""
-
-    try:
-        data = numpy.load(path, allow_pickle=True)
-    except Exception as exc:
-        raise _UnreadableFile("%s: %s" % (type(exc).__name__, exc)) from exc
-
-    try:
-        if hasattr(data, "files"):
-            return _load_arrays(data)
-        if isinstance(data, numpy.ndarray) and data.shape == () and isinstance(data.item(), dict):
-            return _load_arrays(data.item())
-        if isinstance(data, dict):
-            return _load_arrays(data)
-        raise _InvalidMap(
-            "expected a .npz archive or a .npy dict with az_deg, el_deg, "
-            "dra_arcsec, ddec_arcsec, and obstime_unix")
-    finally:
-        close = getattr(data, "close", None)
-        if close is not None:
-            close()
-
-
-def _load_map(path):
-    az_deg, el_deg, dra, ddec, obstime = _arrays_from_path(path)
+def _load_named_map(data):
+    az_deg, el_deg, dra, ddec, obstime = _load_arrays(data)
 
     if az_deg.ndim != 1 or el_deg.ndim != 1:
         raise _InvalidMap("az_deg and el_deg must be 1-d")
@@ -476,6 +536,55 @@ def _load_map(path):
     interp_ddec = RegularGridInterpolator(
         (el_deg, az_deg), ddec, bounds_error=False, fill_value=numpy.nan)
     return _Grid(az_deg, el_deg, interp_dra, interp_ddec, float(obstime))
+
+
+def _load_flow_map(path, data):
+    """Build a :class:`_FlowGrid` from a ``(n, n, 2)`` array.
+
+    Conventions (all **require verification** with the map producer):
+
+    1. Zenith-centered SIN grid; center pixel is zenith; array edge is the
+       horizon.
+    2. ``data[..., 0]`` is west-positive FK5 offset in arcseconds;
+       ``data[..., 1]`` is north-positive FK5 offset in arcseconds.
+    3. Column index increases west; row index increases south.
+    4. Returned sample converts to ``spherical_offsets_by`` as
+       ``dra = -west``, ``ddec = north``.
+    5. Map epoch is parsed from the filename
+       ``flow_<freq>MHz_<YYYYMMDD>_<HHMMSS>.npy``.
+    """
+
+    if data.ndim != 3 or data.shape[0] != data.shape[1] or data.shape[2] != 2:
+        raise _InvalidMap("flow map must have shape (n, n, 2)")
+    if data.shape[0] < 2:
+        raise _InvalidMap("flow map must be at least 2 pixels on a side")
+    obstime_unix = _parse_flow_obstime_unix(path)
+    west = numpy.array(data[:, :, 0], dtype="<f8", copy=True)
+    north = numpy.array(data[:, :, 1], dtype="<f8", copy=True)
+    return _FlowGrid(west, north, obstime_unix)
+
+
+def _load_map(path):
+    try:
+        data = numpy.load(path, allow_pickle=True)
+    except Exception as exc:
+        raise _UnreadableFile("%s: %s" % (type(exc).__name__, exc)) from exc
+
+    try:
+        if hasattr(data, "files"):
+            return _load_named_map(data)
+        if isinstance(data, numpy.ndarray) and data.shape == () and isinstance(data.item(), dict):
+            return _load_named_map(data.item())
+        if isinstance(data, dict):
+            return _load_named_map(data)
+        if isinstance(data, numpy.ndarray) and data.ndim == 3 and data.shape[2] == 2:
+            return _load_flow_map(path, data)
+        raise _InvalidMap(
+            "expected a .npz/.npy named-array map or a flow (n, n, 2) .npy")
+    finally:
+        close = getattr(data, "close", None)
+        if close is not None:
+            close()
 
 
 def _failure_detail(path, frequency_mhz):
