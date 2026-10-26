@@ -36,6 +36,29 @@ NPIPELINE_SERVER = 4
 NSUBBAND = NPIPELINE // NPIPELINE_SUBBAND
 NSERVER = NPIPELINE // NPIPELINE_SERVER
 
+#: Integer subband names in MHz. These are the rounded centers of the sixteen
+#: 192-channel subbands whose centers are ``13.40625 + n * 4.59375`` MHz.
+SUBBAND_FREQUENCIES_MHZ = (13, 18, 23, 27, 32, 36, 41, 46, 50, 55, 59, 64, 69, 73, 78, 82)
+_SUBBAND_MATCH_MHZ = 2.0
+
+
+def subband_mhz(freq_hz):
+    """Return the subband name in MHz for a pipeline frequency array.
+
+    ``freq_hz`` is the channel frequencies in Hz, as stored on
+    ``BeamPointingControl.freqs``. The name is the nearest entry of
+    ``SUBBAND_FREQUENCIES_MHZ`` to the mean frequency in MHz. Both pipelines
+    of one subband select the same name, including a pipeline whose mean sits
+    about 1.15 MHz from the subband center. Returns ``None`` when the mean is
+    more than 2 MHz from every name.
+    """
+
+    center_mhz = float(numpy.mean(freq_hz) / 1e6)
+    name = min(SUBBAND_FREQUENCIES_MHZ, key=lambda mhz: abs(mhz - center_mhz))
+    if abs(name - center_mhz) > _SUBBAND_MATCH_MHZ:
+        return None
+    return name
+
 NSTAND = 352
 NPOL = 2
 
@@ -355,14 +378,17 @@ class BeamPointingControl(object):
         self._weighting = numpy.array([0. if corr_num in flag_ants else fnc2(ant.enz) for corr_num, ant in enumerate(self.station.antennas)])
         self._weighting = numpy.repeat(self._weighting, 2)   # TODO: evaluate different weigthing per pol
         
-    def set_beam_delays(self, delays, pol=0, load_time=None):
+    def set_beam_delays(self, delays, pol=0, load_time=None, pipelines=None):
         """
         Set the beamformer delays to the specified values in ns for the given
-        polarization.
+        polarization.  ``pipelines`` defaults to every pipeline on this
+        instance.  Pass a subset to command one subband.
         """
         
         # Validate
         assert(delays.size == NSTAND*NPOL)
+        if pipelines is None:
+            pipelines = self.pipelines
         
         # Make up some dummy amplitudes
         amps = numpy.zeros(NSTAND*NPOL, dtype=numpy.float32)
@@ -370,8 +396,40 @@ class BeamPointingControl(object):
         amps *= self._weighting
         
         # Set the delays and amplitudes
-        ptp = PipelineTaskPool(self.pipelines)
+        ptp = PipelineTaskPool(pipelines)
         ptp.beamform.update_delays(2*(self.beam-1)+pol, delays, amps, load_time=load_time, time_unit='time')
+
+    def _pointing_delays(self, az, alt, degrees=True):
+        """Return the delay vector for one topocentric azimuth and altitude."""
+
+        if degrees:
+            az *= numpy.pi/180.0
+            alt *= numpy.pi/180.0
+        assert(az >= 0 and az < 2*numpy.pi)
+        assert(alt >= 0 and alt <= numpy.pi/2)
+
+        zen = numpy.array([0, 0, 1])
+        zen_delay = [numpy.dot(zen, ant.enz)/speedOfLight for ant in self.station.antennas]
+        direction = numpy.array([numpy.cos(alt)*numpy.sin(az),
+                                 numpy.cos(alt)*numpy.cos(az),
+                                 numpy.sin(alt)])
+        dir_delay = [numpy.dot(direction, ant.enz)/speedOfLight for ant in self.station.antennas]
+        delays = numpy.array(dir_delay) - numpy.array(zen_delay)
+        delays = numpy.repeat(delays, NPOL)
+        delays = delays.max() - delays
+        return delays
+
+    def _pipelines_by_subband(self):
+        """Group ``self.pipelines`` by :func:`subband_mhz`.
+
+        Pipelines whose mean frequency is not one of the named subbands are
+        stored under ``None``.
+        """
+
+        groups = {}
+        for pipeline, freq in zip(self.pipelines, self.freqs):
+            groups.setdefault(subband_mhz(freq), []).append(pipeline)
+        return groups
         
     def set_beam_pointing(self, az, alt, degrees=True, load_time=None):
         """
@@ -383,34 +441,44 @@ class BeamPointingControl(object):
         # Issue a warning if it doesn't look like we've been calibrated
         if not self.cal_set:
             logger.warn("Calibration is not set, your results may be suspect")
-            
-        # Convertion from degrees -> radians, plus a validation
-        if degrees:
-            az *= numpy.pi/180.0
-            alt *= numpy.pi/180.0
-        assert(az >= 0 and az < 2*numpy.pi)
-        assert(alt >= 0 and alt <= numpy.pi/2)
-        
-        # Figure out what the delays to zenith are
-        # TODO: Is this needed?
-        zen = numpy.array([0, 0, 1])
-        zen_delay = [numpy.dot(zen, ant.enz)/speedOfLight for ant in self.station.antennas]
-        
-        # Figure out what the delays to the pointing direction are
-        dir = numpy.array([numpy.cos(alt)*numpy.sin(az), 
-                           numpy.cos(alt)*numpy.cos(az), 
-                           numpy.sin(alt)])
-        dir_delay = [numpy.dot(dir, ant.enz)/speedOfLight for ant in self.station.antennas]
-        
-        # Subtract what we need from what we have from the calibration
-        # TODO: Is this correct?
-        delays = numpy.array(dir_delay) - numpy.array(zen_delay)
-        delays = numpy.repeat(delays, NPOL)
-        delays = delays.max() - delays
-        
-        # Apply
+
+        delays = self._pointing_delays(az, alt, degrees=degrees)
         for pol in range(NPOL):
             self.set_beam_delays(delays, pol, load_time=load_time)
+
+    def set_beam_pointings(self, pointings, degrees=True, load_time=None):
+        """Point each subband at its own azimuth and altitude.
+
+        ``pointings`` maps a subband name in MHz, one of
+        ``SUBBAND_FREQUENCIES_MHZ``, to an ``(az, alt)`` pair.  ``degrees``
+        and ``load_time`` match :meth:`set_beam_pointing`.  The same
+        ``load_time`` is sent to every subband.  Every pair is validated
+        before any pipeline is commanded.  A name this instance does not host
+        is skipped after a warning.  Pipelines whose subband is absent from
+        ``pointings`` are left unchanged.
+        """
+
+        if not self.cal_set:
+            logger.warn("Calibration is not set, your results may be suspect")
+        if not isinstance(pointings, dict):
+            raise ValueError("pointings must map frequency_mhz to (az, alt)")
+
+        delays_for = {}
+        for frequency_mhz, direction in pointings.items():
+            if type(frequency_mhz) is not int or frequency_mhz not in SUBBAND_FREQUENCIES_MHZ:
+                raise ValueError("frequency_mhz must be one of SUBBAND_FREQUENCIES_MHZ")
+            if not isinstance(direction, (tuple, list)) or len(direction) != 2:
+                raise ValueError("each pointing must be an (az, alt) pair")
+            delays_for[frequency_mhz] = self._pointing_delays(direction[0], direction[1], degrees=degrees)
+
+        groups = self._pipelines_by_subband()
+        for frequency_mhz, delays in delays_for.items():
+            pipelines = groups.get(frequency_mhz)
+            if not pipelines:
+                logger.warning("no pipelines for tip-tilt subband %d MHz" % frequency_mhz)
+                continue
+            for pol in range(NPOL):
+                self.set_beam_delays(delays, pol, load_time=load_time, pipelines=pipelines)
             
     def set_beam_target(self, target_or_ra, dec=None, load_time=None, verbose=True):
         """
@@ -481,12 +549,15 @@ class BeamTracker(object):
         a = [(attr,getattr(self, attr, None)) for attr in ('control_instance', 'update_interval')]
         return tw_fill(_build_repr(n,a), subsequent_indent='    ')
         
-    def track(self, target_or_ra, dec=None, duration=0, start_time=None, verbose=True):
+    def track(self, target_or_ra, dec=None, duration=0, start_time=None, verbose=True, tiptilt=False):
         """
         Given a target name and a tracking duration in seconds, start tracking
         the source.  If the 'dec' keyword is not None, the target is intepreted
         to be a RA.  If the duration is less than or equal to zero the default
-        of 12 hours is used.
+        of 12 hours is used.  ``tiptilt`` defaults to False and the track does
+        not read a tip-tilt map.  When ``tiptilt`` is True, each subband this
+        instance controls is pointed from its own published map.  A subband
+        with no usable map is still pointed, at the uncorrected direction.
         
         .. note:: The tracking can be canceled at any time with a control-C.
         """
@@ -537,17 +608,42 @@ class BeamTracker(object):
                 ## update takes
                 t_mark = time.time()
                 
-                ## Apply the tip-tilt shift, then figure out where the corrected
-                ## target will be in puto seconds.  sc itself is left unchanged.
-                dra_as, ddec_as = get_tiptilt(sc, location=obs)
-                sc_pt = sc.transform_to('fk5').spherical_offsets_by(dra_as * u.arcsec, ddec_as * u.arcsec)
-                aa = sc_pt.transform_to(AltAz(obstime=Time.now()+puto, location=obs))
-                az = aa.az.deg
-                alt = aa.alt.deg
-                logger.info(f"At {time.time():.1f}, moving to azimuth {aa.az}, altitude {aa.alt}")
-                    
-                ## Point
-                self.control_instance.set_beam_pointing(az, alt, degrees=True, load_time=t_mark+2)
+                ## Point.  sc itself is left unchanged.  The default path does
+                ## not read a tip-tilt map.
+                if not tiptilt:
+                    aa = sc.transform_to(AltAz(obstime=Time.now()+puto, location=obs))
+                    az = aa.az.deg
+                    alt = aa.alt.deg
+                    logger.info(f"At {time.time():.1f}, moving to azimuth {aa.az}, altitude {aa.alt}")
+                    self.control_instance.set_beam_pointing(az, alt, degrees=True, load_time=t_mark+2)
+                else:
+                    groups = self.control_instance._pipelines_by_subband()
+                    pointings = {}
+                    for frequency_mhz, _pipelines in groups.items():
+                        if frequency_mhz is None:
+                            continue
+                        dra_as, ddec_as = get_tiptilt(sc, frequency_mhz, location=obs)
+                        sc_pt = sc.transform_to('fk5').spherical_offsets_by(
+                            dra_as * u.arcsec, ddec_as * u.arcsec)
+                        aa = sc_pt.transform_to(AltAz(obstime=Time.now()+puto, location=obs))
+                        pointings[frequency_mhz] = (float(aa.az.deg), float(aa.alt.deg))
+                        logger.info(
+                            "At %.1f, subband %d MHz, moving to azimuth %s, altitude %s, dra %.3f arcsec, ddec %.3f arcsec"
+                            % (time.time(), frequency_mhz, aa.az, aa.alt, dra_as, ddec_as))
+                    if pointings:
+                        self.control_instance.set_beam_pointings(
+                            pointings, degrees=True, load_time=t_mark+2)
+                    unmatched = groups.get(None)
+                    if unmatched:
+                        logger.warning(
+                            "tip-tilt subband name unavailable for %d pipelines; using uncorrected pointing"
+                            % len(unmatched))
+                        aa0 = sc.transform_to(AltAz(obstime=Time.now()+puto, location=obs))
+                        delays = self.control_instance._pointing_delays(
+                            float(aa0.az.deg), float(aa0.alt.deg), degrees=True)
+                        for pol in range(NPOL):
+                            self.control_instance.set_beam_delays(
+                                delays, pol, load_time=t_mark+2, pipelines=unmatched)
                 
                 ## Find how much time we used and when we should sleep until
                 t_used = time.time() - t_mark

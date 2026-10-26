@@ -30,7 +30,15 @@ from astropy.time import Time
 
 import mnc.tiptilt as tiptilt
 from mnc.tiptilt import TIPTILT_ETCD_KEY, get_tiptilt, get_tiptilt_path, set_tiptilt
-from mnc.xengine_beamformer_control import BeamPointingControl, BeamTracker
+from mnc.common import CHAN_BW
+from mnc.xengine_beamformer_control import (
+    SUBBAND_FREQUENCIES_MHZ,
+    BeamPointingControl,
+    BeamTracker,
+    NPOL,
+    NSTAND,
+    subband_mhz,
+)
 
 
 class FakeEtcd(object):
@@ -93,9 +101,57 @@ class RecordingControl(BeamPointingControl):
     def __init__(self, location):
         self.station = _Station(location)
         self.pointings = []
+        self.subband_pointings = []
 
     def set_beam_pointing(self, az, alt, degrees=True, load_time=None):
         self.pointings.append((az, alt, degrees, load_time))
+
+    def set_beam_pointings(self, pointings, degrees=True, load_time=None):
+        self.subband_pointings.append((pointings, degrees, load_time))
+
+
+class _Ant(object):
+    def __init__(self, index):
+        self.enz = (float(index), 0.0, 1.0)
+
+
+class _DelayStation(object):
+    def __init__(self):
+        self.antennas = [_Ant(i) for i in range(NSTAND)]
+
+
+class _DelayRecorder(object):
+    def __init__(self, calls, pipeline_id):
+        self.calls = calls
+        self.pipeline_id = pipeline_id
+        self.host = "fake"
+
+    def update_delays(self, *args, **kwds):
+        self.calls.append((self.pipeline_id, args, kwds))
+
+
+class _FakePipeline(object):
+    def __init__(self, calls, pipeline_id):
+        self.host = "fake"
+        self.pipeline_id = pipeline_id
+        self.beamform = _DelayRecorder(calls, pipeline_id)
+
+
+def _band(center_mhz):
+    return numpy.full(96, center_mhz * 1e6)
+
+
+def _pointing_control(centers_mhz):
+    calls = []
+    control = BeamPointingControl.__new__(BeamPointingControl)
+    control.beam = 1
+    control._gain = 1.0
+    control._cal_set = [True]
+    control._weighting = numpy.ones(NSTAND * NPOL)
+    control.station = _DelayStation()
+    control.pipelines = [_FakePipeline(calls, i) for i in range(len(centers_mhz))]
+    control.freqs = [_band(center) for center in centers_mhz]
+    return control, calls
 
 
 class _Clock(object):
@@ -327,7 +383,41 @@ class TestTipTilt(unittest.TestCase):
             payload = json.loads(client.get(TIPTILT_ETCD_KEY)[0].decode())
             self.assertEqual(set(payload), {"40", "80"})
 
-    def _run_track(self, shift):
+    def test_subband_mhz_matches_known_names(self):
+        width_mhz = 192 * CHAN_BW / 1e6
+        offset_mhz = 48 * CHAN_BW / 1e6
+        centers = [18.0 - width_mhz + n * width_mhz for n in range(len(SUBBAND_FREQUENCIES_MHZ))]
+        for center, name in zip(centers, SUBBAND_FREQUENCIES_MHZ):
+            for sample in (center, center - offset_mhz, center + offset_mhz):
+                self.assertEqual(subband_mhz(_band(sample)), name)
+
+    def test_subband_mhz_rejects_a_distant_mean(self):
+        self.assertIsNone(subband_mhz(_band(5.0)))
+
+    def test_set_beam_pointings_commands_each_subband(self):
+        control, calls = _pointing_control([18.0, 18.0, 23.0, 23.0])
+        control.set_beam_pointings({18: (30.0, 40.0), 23: (50.0, 45.0)}, load_time=12.0)
+        by_pipeline = {}
+        for pipeline_id, args, kwds in calls:
+            by_pipeline.setdefault(pipeline_id, []).append(args[1])
+            self.assertEqual(kwds["load_time"], 12.0)
+        self.assertEqual(set(by_pipeline), {0, 1, 2, 3})
+        self.assertTrue(numpy.array_equal(by_pipeline[0][0], by_pipeline[1][0]))
+        self.assertTrue(numpy.array_equal(by_pipeline[2][0], by_pipeline[3][0]))
+        self.assertFalse(numpy.array_equal(by_pipeline[0][0], by_pipeline[2][0]))
+
+    def test_set_beam_pointings_leaves_unlisted_subband(self):
+        control, calls = _pointing_control([18.0, 23.0])
+        control.set_beam_pointings({18: (30.0, 40.0)})
+        self.assertEqual({pipeline_id for pipeline_id, _args, _kwds in calls}, {0})
+
+    def test_set_beam_pointings_validates_before_commanding(self):
+        control, calls = _pointing_control([18.0, 23.0])
+        with self.assertRaises(AssertionError):
+            control.set_beam_pointings({18: (30.0, 40.0), 23: (10.0, 95.0)})
+        self.assertEqual(calls, [])
+
+    def _run_track(self):
         location = _location()
         control = RecordingControl(EarthLocation.from_geocentric(*_Station(location).ecef, unit=u.m))
         tracker = BeamTracker(control, update_interval=30)
@@ -336,12 +426,16 @@ class TestTipTilt(unittest.TestCase):
         def now():
             return Time(clock.t, format="unix", scale="utc")
 
+        def reject_tiptilt(*_args, **_kwds):
+            raise AssertionError("get_tiptilt should not be called")
+
         with patch("mnc.xengine_beamformer_control.time.time", clock.time), \
              patch("mnc.xengine_beamformer_control.time.sleep", clock.sleep), \
              patch("mnc.xengine_beamformer_control.Time.now", now), \
-             patch("mnc.xengine_beamformer_control.get_tiptilt", return_value=shift):
-            tracker.track("12:00:00", dec="+30:00:00", duration=0.05, frequency_mhz=40)
+             patch("mnc.xengine_beamformer_control.get_tiptilt", side_effect=reject_tiptilt):
+            tracker.track("12:00:00", dec="+30:00:00", duration=0.05)
         self.assertEqual(len(control.pointings), 1)
+        self.assertEqual(control.subband_pointings, [])
         return control.pointings[0], control
 
     def _expected_altaz(self, load_time, dra_as, ddec_as, control):
@@ -357,20 +451,52 @@ class TestTipTilt(unittest.TestCase):
         return sc_pt.transform_to(AltAz(obstime=obstime, location=location))
 
     def test_track_zero_shift_matches_uncorrected_pointing(self):
-        (az, alt, degrees, load_time), control = self._run_track((0.0, 0.0))
+        (az, alt, degrees, load_time), control = self._run_track()
         self.assertTrue(degrees)
         aa = self._expected_altaz(load_time, 0.0, 0.0, control)
         self.assertAlmostEqual(az, aa.az.deg, delta=1e-6)
         self.assertAlmostEqual(alt, aa.alt.deg, delta=1e-6)
 
-    def test_track_nonzero_shift_moves_pointing(self):
-        (az, alt, _degrees, load_time), control = self._run_track((3600.0, 0.0))
+    def test_track_tiptilt_uses_one_direction_per_subband(self):
+        location = _location()
+        control = RecordingControl(EarthLocation.from_geocentric(*_Station(location).ecef, unit=u.m))
+        control.freqs = [_band(18.0), _band(23.0)]
+        control.pipelines = [object(), object()]
+        tracker = BeamTracker(control, update_interval=30)
+        clock = _Clock()
+
+        def now():
+            return Time(clock.t, format="unix", scale="utc")
+
+        def getter(_coord, frequency_mhz, location=None, client=None):
+            if frequency_mhz == 18:
+                return (3600.0, 0.0)
+            if frequency_mhz == 23:
+                return (0.0, 0.0)
+            raise AssertionError("unexpected subband %s" % frequency_mhz)
+
+        with patch("mnc.xengine_beamformer_control.time.time", clock.time), \
+             patch("mnc.xengine_beamformer_control.time.sleep", clock.sleep), \
+             patch("mnc.xengine_beamformer_control.Time.now", now), \
+             patch("mnc.xengine_beamformer_control.get_tiptilt", side_effect=getter):
+            tracker.track("12:00:00", dec="+30:00:00", duration=0.05, tiptilt=True)
+
+        self.assertEqual(control.pointings, [])
+        self.assertEqual(len(control.subband_pointings), 1)
+        pointings, degrees, load_time = control.subband_pointings[0]
+        self.assertTrue(degrees)
+        self.assertEqual(set(pointings), {18, 23})
         corrected = self._expected_altaz(load_time, 3600.0, 0.0, control)
         uncorrected = self._expected_altaz(load_time, 0.0, 0.0, control)
-        self.assertAlmostEqual(az, corrected.az.deg, delta=1e-6)
-        self.assertAlmostEqual(alt, corrected.alt.deg, delta=1e-6)
+        self.assertAlmostEqual(pointings[18][0], corrected.az.deg, delta=1e-6)
+        self.assertAlmostEqual(pointings[18][1], corrected.alt.deg, delta=1e-6)
+        self.assertAlmostEqual(pointings[23][0], uncorrected.az.deg, delta=1e-6)
+        self.assertAlmostEqual(pointings[23][1], uncorrected.alt.deg, delta=1e-6)
         self.assertGreater(
-            max(abs(az - uncorrected.az.deg), abs(alt - uncorrected.alt.deg)),
+            max(
+                abs(pointings[18][0] - pointings[23][0]),
+                abs(pointings[18][1] - pointings[23][1]),
+            ),
             0.1,
         )
 

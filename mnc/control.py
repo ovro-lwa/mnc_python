@@ -336,7 +336,7 @@ class Controller():
     def control_bf(self, num=1, coord=None, coordtype='celestial', targetname=None,
                    track=True, uvweight: Union[str, Callable[[float], float]]='core',
                    flag_ants: Union[str, List[str]]='caltable',
-                   beam_gain=1, duration=0):
+                   beam_gain=1, duration=0, tiptilt=False):
         """ Point and track beamformers.
         num refers to the beamformer number (1 through 8).
         If track=True, target is treated as celestial coords or by target name
@@ -346,6 +346,8 @@ class Controller():
         Note: pol info (A/B) will be stripped to flag whole antenna.
         beam_gain optionally specifies the amplitude scaling for the beam.
         duration is time to track in seconds (0 means 12 hrs).
+        tiptilt defaults to False and tracks without a tip-tilt shift.  Set
+        it True to apply a published map for each subband, when one is available.
         target can be:
          - source name ('zenith', 'sun') or
          - tuple of (ra, dec) in (hourangle, degrees).
@@ -401,9 +403,9 @@ class Controller():
         if track:
             t = xengine_beamformer_control.BeamTracker(self.bfc[num], update_interval=self.conf['xengines']['update_interval'])
             if targetname is not None:
-                t.track(targetname, duration=duration)
+                t.track(targetname, duration=duration, tiptilt=tiptilt)
             elif ra is not None:
-                t.track(ra, dec=dec, duration=duration)
+                t.track(ra, dec=dec, duration=duration, tiptilt=tiptilt)
             else:
                 logging.info(f'Beam {num}: Not tracking for azel input')
         else:
