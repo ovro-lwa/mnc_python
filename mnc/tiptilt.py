@@ -212,8 +212,9 @@ def get_tiptilt(coord: SkyCoord, frequency_mhz, location: Optional[EarthLocation
 
     try:
         grid = _cached_grid(record["path"], record["written_unix"])
-    except _UnreadableFile:
-        return _report(0.0, 0.0, float("nan"), float("nan"), "unreadable file", path, frequency_mhz)
+    except _UnreadableFile as exc:
+        detail = str(exc) if str(exc) else "unreadable file"
+        return _report(0.0, 0.0, float("nan"), float("nan"), detail, path, frequency_mhz)
     except _InvalidMap:
         return _report(0.0, 0.0, float("nan"), float("nan"), "invalid map", path, frequency_mhz)
 
@@ -426,7 +427,7 @@ def _load_map(path):
     except _InvalidMap:
         raise
     except Exception as exc:
-        raise _UnreadableFile from exc
+        raise _UnreadableFile("%s: %s" % (type(exc).__name__, exc)) from exc
 
     if az_deg.ndim != 1 or el_deg.ndim != 1:
         raise _InvalidMap

@@ -297,7 +297,7 @@ class TestTipTilt(unittest.TestCase):
         self.assertEqual(log.warning.call_count, 2)
         for call in log.warning.call_args_list:
             message = call[0][0]
-            self.assertIn("unreadable file", message)
+            self.assertIn("FileNotFoundError", message)
             self.assertIn(missing, message)
             self.assertIn("frequency_mhz=40", message)
 
