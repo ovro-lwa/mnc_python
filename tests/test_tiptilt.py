@@ -64,14 +64,17 @@ def _location():
 
 def _write_map(directory, az_deg, el_deg, dra, ddec, obstime_unix, name="tiptilt.npz"):
     path = os.path.join(directory, name)
-    numpy.savez(
-        path,
+    arrays = dict(
         az_deg=numpy.asarray(az_deg, dtype="<f8"),
         el_deg=numpy.asarray(el_deg, dtype="<f8"),
         dra_arcsec=numpy.asarray(dra, dtype="<f8"),
         ddec_arcsec=numpy.asarray(ddec, dtype="<f8"),
         obstime_unix=numpy.float64(obstime_unix),
     )
+    if name.endswith(".npy"):
+        numpy.save(path, arrays)
+    else:
+        numpy.savez(path, **arrays)
     return path
 
 
@@ -281,6 +284,34 @@ class TestTipTilt(unittest.TestCase):
         dra, ddec = get_tiptilt(coord, 40, location=_location(), client=client)
         self.assertEqual((dra, ddec), (0.0, 0.0))
         self.assertEqual(get_tiptilt_path(40, client=client), missing)
+
+    def test_npy_dict_returns_cell_value(self):
+        location = _location()
+        obstime_unix = Time("2026-01-01T00:00:00", scale="utc").unix
+        az, el, dra, ddec = _grid_maps()
+        client = FakeEtcd()
+        with tempfile.TemporaryDirectory() as directory:
+            path = _write_map(
+                directory, az, el, dra, ddec, obstime_unix, name="flow_40MHz.npy")
+            set_tiptilt(path, 60, 40, client=client)
+            coord = _coord_at(location, obstime_unix, 90.0, 45.0)
+            got = get_tiptilt(coord, 40, location=location, client=client)
+        self.assertEqual(got, (float(dra[1, 1]), float(ddec[1, 1])))
+
+    def test_plain_npy_array_returns_zero_with_clear_reason(self):
+        client = FakeEtcd()
+        coord = SkyCoord(0 * u.deg, 0 * u.deg, frame="fk5")
+        log = MagicMock()
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "flow_40MHz.npy")
+            numpy.save(path, numpy.zeros((4, 4)))
+            set_tiptilt(path, 60, 40, client=client)
+            with patch("mnc.tiptilt._logger", return_value=log):
+                dra, ddec = get_tiptilt(coord, 40, location=_location(), client=client)
+        self.assertEqual((dra, ddec), (0.0, 0.0))
+        message = log.warning.call_args[0][0]
+        self.assertIn("expected a .npz archive or a .npy dict", message)
+        self.assertIn(path, message)
 
     def test_get_tiptilt_path_is_none_without_a_publication(self):
         self.assertIsNone(get_tiptilt_path(40, client=FakeEtcd()))

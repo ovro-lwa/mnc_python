@@ -24,7 +24,8 @@ Etcd key
     for a frequency that is absent or expired does not read a different entry.
 
 Map file
-    Float64 arrays:
+    Either a ``.npz`` archive or a ``.npy`` file that holds a dict (via
+    ``numpy.save``). Both use the same float64 arrays:
 
     - ``az_deg`` — shape ``(n_az,)``, strictly increasing Astropy ``AltAz``
       azimuth in degrees (north through east). Azimuth does not wrap. A
@@ -135,8 +136,8 @@ def _frequency_from_filename(path):
 def set_tiptilt(path, ttl_sec, frequency_mhz=None, client=None):
     """Publish a shift-map file.
 
-    ``path`` is the absolute path of a ``.npz`` map described in the module
-    docstring. The file is not copied and does not need to exist yet.
+    ``path`` is the absolute path of a ``.npz`` or ``.npy`` map described in
+    the module docstring. The file is not copied and does not need to exist yet.
     ``ttl_sec`` is how long the publication stays valid, in seconds. It must
     be greater than zero. ``frequency_mhz`` is the integer subband name in
     MHz. Pass a positive ``int``, or ``None`` to read the one ``_<integer>MHz``
@@ -215,8 +216,9 @@ def get_tiptilt(coord: SkyCoord, frequency_mhz, location: Optional[EarthLocation
     except _UnreadableFile as exc:
         detail = str(exc) if str(exc) else "unreadable file"
         return _report(0.0, 0.0, float("nan"), float("nan"), detail, path, frequency_mhz)
-    except _InvalidMap:
-        return _report(0.0, 0.0, float("nan"), float("nan"), "invalid map", path, frequency_mhz)
+    except _InvalidMap as exc:
+        detail = str(exc) if str(exc) else "invalid map"
+        return _report(0.0, 0.0, float("nan"), float("nan"), detail, path, frequency_mhz)
 
     if location is None:
         location = _default_location()
@@ -413,34 +415,61 @@ def _cached_grid(path, written_unix):
         return grid
 
 
-def _load_map(path):
+def _load_arrays(data):
+    """Return the five map arrays from an NpzFile or a dict-like object."""
+
     try:
-        with numpy.load(path) as data:
-            try:
-                az_deg = numpy.array(data["az_deg"], dtype="<f8", copy=True)
-                el_deg = numpy.array(data["el_deg"], dtype="<f8", copy=True)
-                dra = numpy.array(data["dra_arcsec"], dtype="<f8", copy=True)
-                ddec = numpy.array(data["ddec_arcsec"], dtype="<f8", copy=True)
-                obstime = numpy.array(data["obstime_unix"], dtype="<f8", copy=True)
-            except KeyError as exc:
-                raise _InvalidMap from exc
-    except _InvalidMap:
-        raise
+        az_deg = numpy.array(data["az_deg"], dtype="<f8", copy=True)
+        el_deg = numpy.array(data["el_deg"], dtype="<f8", copy=True)
+        dra = numpy.array(data["dra_arcsec"], dtype="<f8", copy=True)
+        ddec = numpy.array(data["ddec_arcsec"], dtype="<f8", copy=True)
+        obstime = numpy.array(data["obstime_unix"], dtype="<f8", copy=True)
+    except KeyError as exc:
+        raise _InvalidMap("missing array %s" % exc) from exc
+    except (TypeError, ValueError) as exc:
+        raise _InvalidMap("%s" % exc) from exc
+    return az_deg, el_deg, dra, ddec, obstime
+
+
+def _arrays_from_path(path):
+    """Load map arrays from a ``.npz`` archive or a dict saved as ``.npy``."""
+
+    try:
+        data = numpy.load(path, allow_pickle=True)
     except Exception as exc:
         raise _UnreadableFile("%s: %s" % (type(exc).__name__, exc)) from exc
 
+    try:
+        if hasattr(data, "files"):
+            return _load_arrays(data)
+        if isinstance(data, numpy.ndarray) and data.shape == () and isinstance(data.item(), dict):
+            return _load_arrays(data.item())
+        if isinstance(data, dict):
+            return _load_arrays(data)
+        raise _InvalidMap(
+            "expected a .npz archive or a .npy dict with az_deg, el_deg, "
+            "dra_arcsec, ddec_arcsec, and obstime_unix")
+    finally:
+        close = getattr(data, "close", None)
+        if close is not None:
+            close()
+
+
+def _load_map(path):
+    az_deg, el_deg, dra, ddec, obstime = _arrays_from_path(path)
+
     if az_deg.ndim != 1 or el_deg.ndim != 1:
-        raise _InvalidMap
+        raise _InvalidMap("az_deg and el_deg must be 1-d")
     if az_deg.size < 2 or el_deg.size < 2:
-        raise _InvalidMap
+        raise _InvalidMap("az_deg and el_deg must each have at least two points")
     if dra.shape != (el_deg.size, az_deg.size) or ddec.shape != dra.shape:
-        raise _InvalidMap
+        raise _InvalidMap("dra_arcsec and ddec_arcsec must have shape (n_el, n_az)")
     if obstime.shape != ():
-        raise _InvalidMap
+        raise _InvalidMap("obstime_unix must be a scalar")
     if not numpy.all(numpy.diff(az_deg) > 0.0) or not numpy.all(numpy.diff(el_deg) > 0.0):
-        raise _InvalidMap
+        raise _InvalidMap("az_deg and el_deg must be strictly increasing")
     if not numpy.isfinite(obstime):
-        raise _InvalidMap
+        raise _InvalidMap("obstime_unix must be finite")
 
     interp_dra = RegularGridInterpolator(
         (el_deg, az_deg), dra, bounds_error=False, fill_value=numpy.nan)
