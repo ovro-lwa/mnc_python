@@ -1,6 +1,11 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+# setuptools 59.7+ and wheel 0.38+ require Python >=3.7.
+# setuptools 68.2 is the first release that supports Python 3.12.
+requires = [
+    "setuptools>=45,<=59.6.0; python_version<'3.7'",
+    "setuptools>=68.2; python_version>='3.12'",
+    "setuptools>=45; python_version>='3.7' and python_version<'3.12'",
+    "wheel<0.38; python_version<'3.7'",
+    "wheel; python_version>='3.7'",
+]
 build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-py-modules = ["version"]
