@@ -32,11 +32,13 @@ import mnc.tiptilt as tiptilt
 from mnc.tiptilt import TIPTILT_ETCD_KEY, get_tiptilt, get_tiptilt_path, set_tiptilt
 from mnc.common import CHAN_BW
 from mnc.xengine_beamformer_control import (
+    POINTING_ETCD_KEY_TEMPLATE,
     SUBBAND_FREQUENCIES_MHZ,
     BeamPointingControl,
     BeamTracker,
     NPOL,
     NSTAND,
+    publish_commanded_pointing,
     subband_mhz,
 )
 
@@ -106,11 +108,13 @@ class RecordingControl(BeamPointingControl):
         self.pointings = []
         self.subband_pointings = []
 
-    def set_beam_pointing(self, az, alt, degrees=True, load_time=None):
-        self.pointings.append((az, alt, degrees, load_time))
+    def set_beam_pointing(self, az, alt, degrees=True, load_time=None,
+                          nominal=None, etcd_client=None):
+        self.pointings.append((az, alt, degrees, load_time, nominal))
 
-    def set_beam_pointings(self, pointings, degrees=True, load_time=None):
-        self.subband_pointings.append((pointings, degrees, load_time))
+    def set_beam_pointings(self, pointings, degrees=True, load_time=None,
+                           nominal=None, etcd_client=None):
+        self.subband_pointings.append((pointings, degrees, load_time, nominal))
 
 
 class _Ant(object):
@@ -472,7 +476,9 @@ class TestTipTilt(unittest.TestCase):
 
     def test_set_beam_pointings_commands_each_subband(self):
         control, calls = _pointing_control([18.0, 18.0, 23.0, 23.0])
-        control.set_beam_pointings({18: (30.0, 40.0), 23: (50.0, 45.0)}, load_time=12.0)
+        control.set_beam_pointings(
+            {18: (30.0, 40.0), 23: (50.0, 45.0)}, load_time=12.0,
+            nominal=(20.0, 35.0), etcd_client=FakeEtcd())
         by_pipeline = {}
         for pipeline_id, args, kwds in calls:
             by_pipeline.setdefault(pipeline_id, []).append(args[1])
@@ -484,14 +490,54 @@ class TestTipTilt(unittest.TestCase):
 
     def test_set_beam_pointings_leaves_unlisted_subband(self):
         control, calls = _pointing_control([18.0, 23.0])
-        control.set_beam_pointings({18: (30.0, 40.0)})
+        control.set_beam_pointings(
+            {18: (30.0, 40.0)}, nominal=(30.0, 40.0), etcd_client=FakeEtcd())
         self.assertEqual({pipeline_id for pipeline_id, _args, _kwds in calls}, {0})
 
     def test_set_beam_pointings_validates_before_commanding(self):
         control, calls = _pointing_control([18.0, 23.0])
         with self.assertRaises(AssertionError):
-            control.set_beam_pointings({18: (30.0, 40.0), 23: (10.0, 95.0)})
+            control.set_beam_pointings(
+                {18: (30.0, 40.0), 23: (10.0, 95.0)},
+                nominal=(30.0, 40.0), etcd_client=FakeEtcd())
         self.assertEqual(calls, [])
+
+    def test_set_beam_pointings_requires_nominal(self):
+        control, calls = _pointing_control([18.0])
+        with self.assertRaises(ValueError):
+            control.set_beam_pointings({18: (30.0, 40.0)}, etcd_client=FakeEtcd())
+        self.assertEqual(calls, [])
+
+    def test_publish_commanded_pointing_writes_mcs_json(self):
+        client = FakeEtcd()
+        publish_commanded_pointing(3, 123.4, 45.6, client=client, timestamp=1000.0)
+        key = POINTING_ETCD_KEY_TEMPLATE % 3
+        payload = json.loads(client.store[key].decode())
+        self.assertEqual(payload["timestamp"], 1000.0)
+        self.assertEqual(payload["unit"], "deg")
+        self.assertEqual(payload["value"]["nominal"], {"az_deg": 123.4, "el_deg": 45.6})
+        self.assertNotIn("commanded_by_frequency_mhz", payload["value"])
+
+    def test_set_beam_pointing_publishes_nominal_defaulting_to_commanded(self):
+        control, _calls = _pointing_control([18.0])
+        client = FakeEtcd()
+        control.set_beam_pointing(12.5, 60.0, degrees=True, etcd_client=client)
+        payload = json.loads(client.store[POINTING_ETCD_KEY_TEMPLATE % 1].decode())
+        self.assertEqual(payload["value"]["nominal"], {"az_deg": 12.5, "el_deg": 60.0})
+        self.assertNotIn("commanded_by_frequency_mhz", payload["value"])
+        self.assertEqual(payload["unit"], "deg")
+
+    def test_set_beam_pointings_publishes_nominal_and_per_subband(self):
+        control, _calls = _pointing_control([18.0, 23.0])
+        client = FakeEtcd()
+        control.set_beam_pointings(
+            {18: (30.0, 40.0), 23: (50.0, 45.0)},
+            nominal=(25.0, 42.0), etcd_client=client)
+        payload = json.loads(client.store[POINTING_ETCD_KEY_TEMPLATE % 1].decode())
+        self.assertEqual(payload["value"]["nominal"], {"az_deg": 25.0, "el_deg": 42.0})
+        by_freq = payload["value"]["commanded_by_frequency_mhz"]
+        self.assertEqual(by_freq["18"], {"az_deg": 30.0, "el_deg": 40.0})
+        self.assertEqual(by_freq["23"], {"az_deg": 50.0, "el_deg": 45.0})
 
     def _run_track(self):
         location = _location()
@@ -527,11 +573,13 @@ class TestTipTilt(unittest.TestCase):
         return sc_pt.transform_to(AltAz(obstime=obstime, location=location))
 
     def test_track_zero_shift_matches_uncorrected_pointing(self):
-        (az, alt, degrees, load_time), control = self._run_track()
+        (az, alt, degrees, load_time, nominal), control = self._run_track()
         self.assertTrue(degrees)
         aa = self._expected_altaz(load_time, 0.0, 0.0, control)
         self.assertAlmostEqual(az, aa.az.deg, delta=1e-6)
         self.assertAlmostEqual(alt, aa.alt.deg, delta=1e-6)
+        self.assertAlmostEqual(nominal[0], aa.az.deg, delta=1e-6)
+        self.assertAlmostEqual(nominal[1], aa.alt.deg, delta=1e-6)
 
     def test_track_tiptilt_uses_one_direction_per_subband(self):
         location = _location()
@@ -559,7 +607,7 @@ class TestTipTilt(unittest.TestCase):
 
         self.assertEqual(control.pointings, [])
         self.assertEqual(len(control.subband_pointings), 1)
-        pointings, degrees, load_time = control.subband_pointings[0]
+        pointings, degrees, load_time, nominal = control.subband_pointings[0]
         self.assertTrue(degrees)
         self.assertEqual(set(pointings), {18, 23})
         corrected = self._expected_altaz(load_time, 3600.0, 0.0, control)
@@ -568,6 +616,8 @@ class TestTipTilt(unittest.TestCase):
         self.assertAlmostEqual(pointings[18][1], corrected.alt.deg, delta=1e-6)
         self.assertAlmostEqual(pointings[23][0], uncorrected.az.deg, delta=1e-6)
         self.assertAlmostEqual(pointings[23][1], uncorrected.alt.deg, delta=1e-6)
+        self.assertAlmostEqual(nominal[0], uncorrected.az.deg, delta=1e-6)
+        self.assertAlmostEqual(nominal[1], uncorrected.alt.deg, delta=1e-6)
         self.assertGreater(
             max(
                 abs(pointings[18][0] - pointings[23][0]),
