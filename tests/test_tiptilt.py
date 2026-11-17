@@ -154,6 +154,20 @@ def _band(center_mhz):
     return numpy.full(96, center_mhz * 1e6)
 
 
+def _info_texts(log):
+    """Format logger.info mock calls for assertions (Python 3.6-safe)."""
+    texts = []
+    for call in log.info.call_args_list:
+        args = call[0]
+        if not args:
+            continue
+        if len(args) == 1:
+            texts.append(str(args[0]))
+        else:
+            texts.append(args[0] % args[1:])
+    return texts
+
+
 def _pointing_control(centers_mhz):
     calls = []
     control = BeamPointingControl.__new__(BeamPointingControl)
@@ -563,7 +577,7 @@ class TestTipTilt(unittest.TestCase):
         self.assertEqual(by_freq["18"], {"az_deg": 30.0, "el_deg": 40.0})
         self.assertEqual(by_freq["23"], {"az_deg": 50.0, "el_deg": 45.0})
 
-    def _run_track(self):
+    def _run_track(self, log=None):
         location = _location()
         control = RecordingControl(EarthLocation.from_geocentric(*_Station(location).ecef, unit=u.m))
         tracker = BeamTracker(control, update_interval=30)
@@ -575,11 +589,21 @@ class TestTipTilt(unittest.TestCase):
         def reject_tiptilt(*_args, **_kwds):
             raise AssertionError("get_tiptilt should not be called")
 
-        with patch("mnc.xengine_beamformer_control.time.time", clock.time), \
-             patch("mnc.xengine_beamformer_control.time.sleep", clock.sleep), \
-             patch("mnc.xengine_beamformer_control.Time.now", now), \
-             patch("mnc.xengine_beamformer_control.get_tiptilt", side_effect=reject_tiptilt):
+        patches = [
+            patch("mnc.xengine_beamformer_control.time.time", clock.time),
+            patch("mnc.xengine_beamformer_control.time.sleep", clock.sleep),
+            patch("mnc.xengine_beamformer_control.Time.now", now),
+            patch("mnc.xengine_beamformer_control.get_tiptilt", side_effect=reject_tiptilt),
+        ]
+        if log is not None:
+            patches.append(patch("mnc.xengine_beamformer_control.logger", log))
+        for p in patches:
+            p.start()
+        try:
             tracker.track("12:00:00", dec="+30:00:00", duration=0.05)
+        finally:
+            for p in reversed(patches):
+                p.stop()
         self.assertEqual(len(control.pointings), 1)
         self.assertEqual(control.subband_pointings, [])
         return control.pointings[0], control
@@ -605,6 +629,14 @@ class TestTipTilt(unittest.TestCase):
         self.assertAlmostEqual(nominal[0], aa.az.deg, delta=1e-6)
         self.assertAlmostEqual(nominal[1], aa.alt.deg, delta=1e-6)
 
+    def test_track_logs_tiptilt_disabled_reason(self):
+        log = MagicMock()
+        self._run_track(log=log)
+        texts = _info_texts(log)
+        self.assertTrue(
+            any("tip-tilt not applied: tiptilt disabled for this track" in t for t in texts),
+            texts)
+
     def test_track_tiptilt_uses_one_direction_per_subband(self):
         location = _location()
         control = RecordingControl(EarthLocation.from_geocentric(*_Station(location).ecef, unit=u.m))
@@ -612,6 +644,7 @@ class TestTipTilt(unittest.TestCase):
         control.pipelines = [object(), object()]
         tracker = BeamTracker(control, update_interval=30)
         clock = _Clock()
+        log = MagicMock()
 
         def now():
             return Time(clock.t, format="unix", scale="utc")
@@ -623,10 +656,17 @@ class TestTipTilt(unittest.TestCase):
                 return (0.0, 0.0)
             raise AssertionError("unexpected subband %s" % frequency_mhz)
 
+        def path_for(frequency_mhz, client=None):
+            if frequency_mhz == 18:
+                return "/tmp/map_18.npz"
+            return None
+
         with patch("mnc.xengine_beamformer_control.time.time", clock.time), \
              patch("mnc.xengine_beamformer_control.time.sleep", clock.sleep), \
              patch("mnc.xengine_beamformer_control.Time.now", now), \
-             patch("mnc.xengine_beamformer_control.get_tiptilt", side_effect=getter):
+             patch("mnc.xengine_beamformer_control.get_tiptilt", side_effect=getter), \
+             patch("mnc.xengine_beamformer_control.get_tiptilt_path", side_effect=path_for), \
+             patch("mnc.xengine_beamformer_control.logger", log):
             tracker.track("12:00:00", dec="+30:00:00", duration=0.05, tiptilt=True)
 
         self.assertEqual(control.pointings, [])
@@ -649,6 +689,82 @@ class TestTipTilt(unittest.TestCase):
             ),
             0.1,
         )
+
+        texts = _info_texts(log)
+        map_logs = [t for t in texts if t.startswith("tip-tilt maps for this track:")]
+        self.assertEqual(len(map_logs), 1)
+        self.assertIn("/tmp/map_18.npz (18 MHz)", map_logs[0])
+        self.assertIn("no map for 23 MHz", map_logs[0])
+        move_logs = [t for t in texts if "moving to azimuth" in t and "dra" in t]
+        self.assertEqual(len(move_logs), 1)
+        self.assertIn("dra 3600.000 arcsec", move_logs[0])
+        self.assertNotIn("23 MHz", move_logs[0])
+        self.assertFalse(any("all frequencies" in t.lower() for t in texts))
+
+    def test_track_tiptilt_logs_one_line_per_map_when_several(self):
+        location = _location()
+        control = RecordingControl(EarthLocation.from_geocentric(*_Station(location).ecef, unit=u.m))
+        control.freqs = [_band(18.0), _band(23.0)]
+        control.pipelines = [object(), object()]
+        tracker = BeamTracker(control, update_interval=30)
+        clock = _Clock()
+        log = MagicMock()
+
+        def now():
+            return Time(clock.t, format="unix", scale="utc")
+
+        def getter(_coord, frequency_mhz, location=None, client=None):
+            if frequency_mhz == 18:
+                return (3600.0, 0.0)
+            if frequency_mhz == 23:
+                return (0.0, 1800.0)
+            raise AssertionError("unexpected subband %s" % frequency_mhz)
+
+        def path_for(frequency_mhz, client=None):
+            return "/tmp/map_%d.npz" % frequency_mhz
+
+        with patch("mnc.xengine_beamformer_control.time.time", clock.time), \
+             patch("mnc.xengine_beamformer_control.time.sleep", clock.sleep), \
+             patch("mnc.xengine_beamformer_control.Time.now", now), \
+             patch("mnc.xengine_beamformer_control.get_tiptilt", side_effect=getter), \
+             patch("mnc.xengine_beamformer_control.get_tiptilt_path", side_effect=path_for), \
+             patch("mnc.xengine_beamformer_control.logger", log):
+            tracker.track("12:00:00", dec="+30:00:00", duration=0.05, tiptilt=True)
+
+        texts = _info_texts(log)
+        map_logs = [t for t in texts if t.startswith("tip-tilt maps for this track:")]
+        self.assertEqual(len(map_logs), 1)
+        self.assertIn("/tmp/map_18.npz (18 MHz)", map_logs[0])
+        self.assertIn("/tmp/map_23.npz (23 MHz)", map_logs[0])
+        multi = [t for t in texts if t.startswith("At ") and "tip-tilt pointings:" in t]
+        self.assertEqual(len(multi), 1)
+        self.assertIn("18 MHz", multi[0])
+        self.assertIn("23 MHz", multi[0])
+
+    def test_track_tiptilt_logs_when_no_maps_published(self):
+        location = _location()
+        control = RecordingControl(EarthLocation.from_geocentric(*_Station(location).ecef, unit=u.m))
+        control.freqs = [_band(18.0), _band(23.0)]
+        control.pipelines = [object(), object()]
+        tracker = BeamTracker(control, update_interval=30)
+        clock = _Clock()
+        log = MagicMock()
+
+        def now():
+            return Time(clock.t, format="unix", scale="utc")
+
+        with patch("mnc.xengine_beamformer_control.time.time", clock.time), \
+             patch("mnc.xengine_beamformer_control.time.sleep", clock.sleep), \
+             patch("mnc.xengine_beamformer_control.Time.now", now), \
+             patch("mnc.xengine_beamformer_control.get_tiptilt", return_value=(0.0, 0.0)), \
+             patch("mnc.xengine_beamformer_control.get_tiptilt_path", return_value=None), \
+             patch("mnc.xengine_beamformer_control.logger", log):
+            tracker.track("12:00:00", dec="+30:00:00", duration=0.05, tiptilt=True)
+
+        texts = _info_texts(log)
+        self.assertTrue(
+            any("tip-tilt not applied: no published map for subbands" in t for t in texts),
+            texts)
 
 
 if __name__ == "__main__":

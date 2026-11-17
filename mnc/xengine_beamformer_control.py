@@ -25,7 +25,7 @@ speedOfLight = speedOfLight.to('m/ns').value
 from lwa_antpos.station import ovro
 
 from mnc.common import NPIPELINE, chan_to_freq, ETCD_HOST, get_logger
-from mnc.tiptilt import apply_fk5_offsets, get_tiptilt
+from mnc.tiptilt import apply_fk5_offsets, get_tiptilt, get_tiptilt_path
 
 logger = get_logger(__name__)
 
@@ -681,6 +681,12 @@ class BeamTracker(object):
         not read a tip-tilt map.  When ``tiptilt`` is True, each subband this
         instance controls is pointed from its own published map.  A subband
         with no usable map is still pointed, at the uncorrected direction.
+
+        Logging: when tip-tilt is not applied, the reason is logged once at
+        session start.  When it is applied, the published map paths for this
+        track's subbands are logged once.  Each pointing update logs the
+        commanded direction and correction on one line; a single map yields a
+        single correction (frequencies are not enumerated).
         
         .. note:: The tracking can be canceled at any time with a control-C.
         """
@@ -722,6 +728,38 @@ class BeamTracker(object):
         if start_time is None:
             start_time = time.time()
         t_stop = start_time + duration
+
+        # Session-start tip-tilt logging (once per track).
+        map_by_freq = {}
+        if not tiptilt:
+            logger.info("tip-tilt not applied: tiptilt disabled for this track")
+        else:
+            groups0 = self.control_instance._pipelines_by_subband()
+            frequencies = sorted(freq for freq in groups0 if freq is not None)
+            for frequency_mhz in frequencies:
+                path = get_tiptilt_path(frequency_mhz)
+                if path is not None:
+                    map_by_freq[frequency_mhz] = path
+            if not frequencies:
+                logger.info("tip-tilt not applied: no named subbands on this beam")
+            elif not map_by_freq:
+                logger.info(
+                    "tip-tilt not applied: no published map for subbands %s MHz"
+                    % (frequencies,))
+            else:
+                by_path = {}
+                for frequency_mhz, path in map_by_freq.items():
+                    by_path.setdefault(path, []).append(frequency_mhz)
+                parts = []
+                for path in sorted(by_path):
+                    freqs = ",".join("%d" % f for f in by_path[path])
+                    parts.append("%s (%s MHz)" % (path, freqs))
+                missing = [f for f in frequencies if f not in map_by_freq]
+                if missing:
+                    parts.append(
+                        "no map for %s MHz"
+                        % (",".join("%d" % f for f in missing),))
+                logger.info("tip-tilt maps for this track: %s" % "; ".join(parts))
         
         try:
             # Go!
@@ -745,16 +783,44 @@ class BeamTracker(object):
                 else:
                     groups = self.control_instance._pipelines_by_subband()
                     pointings = {}
+                    corrections = []
                     for frequency_mhz, _pipelines in groups.items():
                         if frequency_mhz is None:
                             continue
+                        path = get_tiptilt_path(frequency_mhz)
                         dra_as, ddec_as = get_tiptilt(sc, frequency_mhz, location=obs)
                         sc_pt = apply_fk5_offsets(sc, dra_as, ddec_as)
                         aa = sc_pt.transform_to(AltAz(obstime=Time.now()+puto, location=obs))
                         pointings[frequency_mhz] = (float(aa.az.deg), float(aa.alt.deg))
-                        logger.info(
-                            "At %.1f, subband %d MHz, moving to azimuth %s, altitude %s, dra %.3f arcsec, ddec %.3f arcsec"
-                            % (time.time(), frequency_mhz, aa.az, aa.alt, dra_as, ddec_as))
+                        corrections.append(
+                            (frequency_mhz, path, dra_as, ddec_as, aa.az, aa.alt))
+                    if corrections:
+                        paths = set(
+                            path for _f, path, _dra, _ddec, _az, _el in corrections
+                            if path is not None)
+                        if len(paths) <= 1:
+                            # One map (or none): one direction + one correction.
+                            _f, _path, dra_as, ddec_as, az, alt = corrections[0]
+                            if len(paths) == 1:
+                                # Prefer a sample from a frequency that has the map.
+                                for item in corrections:
+                                    if item[1] is not None:
+                                        _f, _path, dra_as, ddec_as, az, alt = item
+                                        break
+                            logger.info(
+                                "At %.1f, moving to azimuth %s, altitude %s, "
+                                "dra %.3f arcsec, ddec %.3f arcsec"
+                                % (time.time(), az, alt, dra_as, ddec_as))
+                        else:
+                            bits = []
+                            for frequency_mhz, _path, dra_as, ddec_as, az, alt in sorted(
+                                    corrections, key=lambda item: item[0]):
+                                bits.append(
+                                    "%d MHz az %s el %s dra %.3f ddec %.3f"
+                                    % (frequency_mhz, az, alt, dra_as, ddec_as))
+                            logger.info(
+                                "At %.1f, tip-tilt pointings: %s"
+                                % (time.time(), "; ".join(bits)))
                     if pointings:
                         self.control_instance.set_beam_pointings(
                             pointings, degrees=True, load_time=t_mark+2, nominal=nominal)
