@@ -25,7 +25,7 @@ speedOfLight = speedOfLight.to('m/ns').value
 from lwa_antpos.station import ovro
 
 from mnc.common import NPIPELINE, chan_to_freq, ETCD_HOST, get_logger
-from mnc.tiptilt import get_tiptilt
+from mnc.tiptilt import apply_fk5_offsets, get_tiptilt
 
 logger = get_logger(__name__)
 
@@ -749,8 +749,7 @@ class BeamTracker(object):
                         if frequency_mhz is None:
                             continue
                         dra_as, ddec_as = get_tiptilt(sc, frequency_mhz, location=obs)
-                        sc_pt = sc.transform_to('fk5').spherical_offsets_by(
-                            dra_as * u.arcsec, ddec_as * u.arcsec)
+                        sc_pt = apply_fk5_offsets(sc, dra_as, ddec_as)
                         aa = sc_pt.transform_to(AltAz(obstime=Time.now()+puto, location=obs))
                         pointings[frequency_mhz] = (float(aa.az.deg), float(aa.alt.deg))
                         logger.info(

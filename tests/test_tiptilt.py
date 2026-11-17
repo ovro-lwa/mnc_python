@@ -29,7 +29,13 @@ from astropy.coordinates import AltAz, Angle, EarthLocation, SkyCoord
 from astropy.time import Time
 
 import mnc.tiptilt as tiptilt
-from mnc.tiptilt import TIPTILT_ETCD_KEY, get_tiptilt, get_tiptilt_path, set_tiptilt
+from mnc.tiptilt import (
+    TIPTILT_ETCD_KEY,
+    apply_fk5_offsets,
+    get_tiptilt,
+    get_tiptilt_path,
+    set_tiptilt,
+)
 from mnc.common import CHAN_BW
 from mnc.xengine_beamformer_control import (
     POINTING_ETCD_KEY_TEMPLATE,
@@ -177,6 +183,24 @@ class TestTipTilt(unittest.TestCase):
         tiptilt._cache.clear()
         tiptilt._last_shift.clear()
         tiptilt._last_fallback.clear()
+
+    def test_apply_fk5_offsets_matches_skyoffset_frame(self):
+        from astropy.coordinates import SkyOffsetFrame
+
+        sc = SkyCoord(86.75309 * u.deg, -31.5633 * u.deg, frame="fk5")
+        dra_as, ddec_as = 1.3 * 60.0, -0.7 * 60.0
+        got = apply_fk5_offsets(sc, dra_as, ddec_as)
+        expected = SkyCoord(
+            SkyOffsetFrame(
+                dra_as * u.arcsec, ddec_as * u.arcsec, origin=sc.frame
+            ).transform_to(sc)
+        )
+        self.assertAlmostEqual(got.ra.deg, expected.ra.deg, places=10)
+        self.assertAlmostEqual(got.dec.deg, expected.dec.deg, places=10)
+        if hasattr(sc, "spherical_offsets_by"):
+            modern = sc.spherical_offsets_by(dra_as * u.arcsec, ddec_as * u.arcsec)
+            self.assertAlmostEqual(got.ra.deg, modern.ra.deg, places=10)
+            self.assertAlmostEqual(got.dec.deg, modern.dec.deg, places=10)
 
     def test_set_rejects_relative_path_and_nonpositive_ttl(self):
         client = FakeEtcd()
@@ -569,7 +593,7 @@ class TestTipTilt(unittest.TestCase):
             Angle("+30:00:00", unit="deg"),
             frame="fk5",
         )
-        sc_pt = sc.transform_to("fk5").spherical_offsets_by(dra_as * u.arcsec, ddec_as * u.arcsec)
+        sc_pt = apply_fk5_offsets(sc, dra_as, ddec_as)
         return sc_pt.transform_to(AltAz(obstime=obstime, location=location))
 
     def test_track_zero_shift_matches_uncorrected_pointing(self):

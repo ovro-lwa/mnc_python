@@ -53,14 +53,15 @@ Map file (OVRO-LWA flow ``.npy``)
       (``REQUIRES VERIFICATION``).
     - Map epoch is the UTC time in the filename; the station is OVRO-LWA.
 
-Lookup and apply
+    Lookup and apply
     The sample coordinate is the target transformed to ``AltAz`` at the
     map epoch and the station location. Named-array maps interpolate on
     ``(el_deg, az_deg)``. Flow maps convert az/el to SIN pixels, then
     interpolate. The tracker applies the returned ``(dra, ddec)`` in FK5
-    with ``SkyCoord.spherical_offsets_by`` and then transforms that
-    corrected coordinate to the pointing time. Callers must not add the
-    shift onto a coordinate that was already corrected.
+    with :func:`apply_fk5_offsets` (Astropy 4.0-compatible stand-in for
+    ``SkyCoord.spherical_offsets_by``) and then transforms that corrected
+    coordinate to the pointing time. Callers must not add the shift onto a
+    coordinate that was already corrected.
 
 Zero shift
     :func:`get_tiptilt` returns ``(0.0, 0.0)`` and does not raise when the key
@@ -85,11 +86,38 @@ from astropy.time import Time
 from scipy.interpolate import RegularGridInterpolator
 
 
-__all__ = ["TIPTILT_ETCD_KEY", "set_tiptilt", "get_tiptilt", "get_tiptilt_path"]
+__all__ = [
+    "TIPTILT_ETCD_KEY",
+    "set_tiptilt",
+    "get_tiptilt",
+    "get_tiptilt_path",
+    "apply_fk5_offsets",
+]
 
 
 #: Provisional etcd key. This is the only place the path is spelled.
 TIPTILT_ETCD_KEY = "/mon/beamformer/tiptilt"
+
+
+def apply_fk5_offsets(coord, dra_arcsec, ddec_arcsec):
+    """Return ``coord`` shifted by FK5 true-angle offsets in arcseconds.
+
+    Equivalent to ``SkyCoord.spherical_offsets_by`` (Astropy >= 4.3). The
+    deployment environment pins Astropy 4.0.2, which lacks that method, so
+    this uses :class:`~astropy.coordinates.SkyOffsetFrame` instead. The
+    result is always in the FK5 frame.
+    """
+    import astropy.units as u
+    from astropy.coordinates import SkyOffsetFrame
+
+    sc = coord.transform_to("fk5")
+    d_lon = dra_arcsec * u.arcsec
+    d_lat = ddec_arcsec * u.arcsec
+    if hasattr(sc, "spherical_offsets_by"):
+        return sc.spherical_offsets_by(d_lon, d_lat)
+    return SkyCoord(
+        SkyOffsetFrame(d_lon, d_lat, origin=sc.frame).transform_to(sc)
+    )
 
 _SHIFT_LOG_TOL_ARCSEC = 1e-3
 _FREQUENCY_IN_NAME = re.compile(r"_(\d+)MHz")
@@ -264,7 +292,7 @@ def get_tiptilt(coord: SkyCoord, frequency_mhz, location: Optional[EarthLocation
     by beam tracking. The sample azimuth and elevation are ``coord`` in
     ``AltAz`` at the map's ``obstime_unix``. Returned offsets are FK5
     true-angle longitude and latitude shifts for
-    ``SkyCoord.spherical_offsets_by``.
+    :func:`apply_fk5_offsets`.
 
     ``client`` matches :func:`set_tiptilt`. A missing, expired, or unusable
     map for this frequency returns ``(0.0, 0.0)`` and logs the reason. A
