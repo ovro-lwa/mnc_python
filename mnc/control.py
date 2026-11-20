@@ -458,7 +458,28 @@ class Controller():
             raise RuntimeError(msg)
 
         logger.info('Starting X-engine and configuring for visibilities.')
-        self.pcontroller.start_pipelines(timeout=timeout)
+        # Pass etcdhost so GPU-side start_pipeline does not use its hardcoded default.
+        for pl in self.pcontroller.pipelines:
+            pl.corr_interface.send_command(
+                pl.host,
+                cmd='start_pipeline',
+                block='xctrl',
+                xid=pl.pipeline_id,
+                etcdhost=self.etcdhost,
+            )
+        t0 = time.time()
+        while True:
+            try:
+                time.sleep(1)
+                if self.pcontroller.pipelines_are_up():
+                    time.sleep(2)
+                    logger.info('Pipelines all appear to be ready after %.1f seconds' % (time.time() - t0))
+                    break
+            except Exception:
+                pass
+            if time.time() - t0 > timeout:
+                logger.warning('Timeout waiting for pipelines to come up after %.1f seconds' % timeout)
+                break
         try:
             self.pcontroller.configure_corr(dest_ip=self.x_dest_corr_ip, dest_port=self.x_dest_corr_slow_port)  # iterates over all slow corr outputs
         except KeyError:
